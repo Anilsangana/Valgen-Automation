@@ -1,0 +1,29 @@
+{
+  "name": "valgenesis_automation",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/server/api.js",
+    "dev": "ts-node-dev --respawn --transpile-only src/server/api.ts",
+    "verify-env": "node ./scripts/verify-env.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "@playwright/test": "^1.57.0",
+    "@types/body-parser": "^1.19.6",
+    "@types/express": "^5.0.6",
+    "@types/node": "^25.0.3",
+    "@types/papaparse": "^5.5.2",
+    "dotenv": "^17.2.3",
+    "express": "^4.18.2",
+    "papaparse": "^5.4.1",
+    "playwright": "^1.57.0",
+    "ts-node-dev": "^2.0.0",
+    "ws": "^8.13.0"
+  }
+}

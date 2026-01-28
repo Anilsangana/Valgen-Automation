@@ -1,0 +1,87 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>ValGenesis Admin Automation</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+
+<body>
+  <div class="topbar">
+    <div class="brand">ValGenesis Automation Console</div>
+    <div class="env-pill">
+      <span class="dot"></span> Connected
+    </div>
+  </div>
+
+  <div class="container">
+
+    <div class="card hero-card">
+      <h1>Administration Automation</h1>
+      <p class="subtitle">
+        Securely execute administrative automation workflows with audit history and live activity tracking.
+      </p>
+    </div>
+
+    <div class="grid-2">
+
+      <!-- SETTINGS -->
+      <section class="card">
+        <h2>Connection Settings</h2>
+
+        <label>Base URL
+          <input id="baseUrl"
+            value="https://vgusdev01.valgenesis.net/PIHEALTH-DEV/login/login.aspx?ReturnUrl=/PIHEALTH-DEV/default.aspx">
+        </label>
+
+        <div class="grid-3">
+          <label>Username
+            <input id="username">
+          </label>
+
+          <label>Password
+            <input id="password" type="password">
+          </label>
+        </div>
+
+        <label>Choose Functionality</label>
+<select id="featureSelect">
+  <option value="">-- Select Functionality --</option>
+  <option value="roles">Create Roles</option>
+  <option value="users">Create Users</option>
+  <option value="assign">Assign Roles to Users</option>
+  <option value="departments">Create Departments</option>
+</select>
+
+<div id="featureInputs" class="dynamic-box"></div>
+
+<div class="buttons">
+  <button class="primary" id="btnRun"><span class="spinner"></span> Run</button>
+</div>
+
+      </section>
+
+      <!-- LOGS -->
+      <section class="card">
+        <h2>Live Execution Logs</h2>
+        <pre id="logArea" class="log"></pre>
+      </section>
+
+    </div>
+
+      <!-- RESULTS -->
+      <section class="card" id="resultsSection" style="display:none;">
+        <h2>Creation Results</h2>
+        <div id="resultsList"></div>
+      </section>
+
+  </div>
+
+  <footer class="footer">
+    © 2026 | ValGenesis Admin Automation | Secure Execution Framework
+  </footer>
+
+  <script src="app.js" defer></script>
+
+</body>
+</html>
