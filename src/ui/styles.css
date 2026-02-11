@@ -93,15 +93,100 @@ body {
   box-shadow: 0 8px 32px rgba(0, 0, 0, .3);
 }
 
+
 .brand {
-  font-size: 18px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.brand-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.brand-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.brand-name {
+  font-size: 20px;
   font-weight: 700;
-  background: linear-gradient(135deg, var(--primary) 0%, var(--accent-3) 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: white;
+  letter-spacing: -0.5px;
+}
+
+.brand-subtitle {
+  font-size: 11px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.8);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+}
+
+.header-badges {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.compliance-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: var(--r-full);
+  font-size: 11px;
+  font-weight: 600;
+  color: white;
+  text-transform: uppercase;
   letter-spacing: 0.5px;
-  font-kerning: auto;
+  backdrop-filter: blur(10px);
+}
+
+.badge-icon {
+  font-size: 14px;
+  opacity: 0.9;
+}
+
+.status-pill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: rgba(0, 166, 81, 0.2);
+  border: 1px solid rgba(0, 166, 81, 0.4);
+  border-radius: var(--r-full);
+  font-size: 12px;
+  font-weight: 600;
+  color: #FFFFFF;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  background: #00E676;
+  border-radius: 50%;
+  animation: pulse-status 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes pulse-status {
+
+  0%,
+  100% {
+    opacity: 1;
+    box-shadow: 0 0 0 0 rgba(0, 230, 118, 0.7);
+  }
+
+  50% {
+    opacity: 0.7;
+    box-shadow: 0 0 0 8px rgba(0, 230, 118, 0);
+  }
 }
 
 .env-pill {
@@ -735,4 +820,49 @@ button:disabled {
 .slide-in {
   opacity: 0;
   /* meaningful start state */
+}
+
+/* =========================================================
+   PDF DOWNLOAD BUTTON
+========================================================= */
+.pdf-download-btn {
+  width: 100%;
+  padding: 16px 24px;
+  margin: 16px 0;
+  border-radius: var(--r-md);
+  border: none;
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: white;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  box-shadow:
+    0 4px 20px rgba(16, 185, 129, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  transition: all var(--normal) var(--ease);
+  animation: slideIn 400ms var(--ease-bounce) forwards;
+}
+
+.pdf-download-btn span {
+  font-size: 20px;
+  line-height: 1;
+}
+
+.pdf-download-btn:hover {
+  background: linear-gradient(135deg, #059669 0%, #047857 100%);
+  transform: translateY(-3px);
+  box-shadow:
+    0 8px 30px rgba(16, 185, 129, 0.6),
+    0 0 30px rgba(16, 185, 129, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
+.pdf-download-btn:active {
+  transform: translateY(-1px);
 }

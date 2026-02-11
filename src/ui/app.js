@@ -399,6 +399,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (result?.success && result.result?.length) {
       displayResults(result.result, feature);
+    } else if (result?.success && result.result && typeof result.result === 'object') {
+      // Handle unified flow results
+      displayResults([result.result], feature);
+    }
+
+    // Generate PDF audit trail for successful operations
+    if (result?.success) {
+      await generateAuditPDF(feature, body, result.result);
     }
 
     // Hide spinner at end
@@ -406,5 +414,80 @@ document.addEventListener("DOMContentLoaded", () => {
     runBtn.disabled = false;
 
   });
+
+  // ===================== PDF GENERATION =====================
+
+  async function generateAuditPDF(operation, requestBody, results) {
+    try {
+      appendLog('📄 Generating PDF audit trail...');
+
+      const pdfData = {
+        operation: getOperationDisplayName(operation),
+        adminUser: requestBody.username,
+        baseUrl: requestBody.baseUrl,
+        results: {}
+      };
+
+      // Map results based on operation type
+      if (operation === 'roles') {
+        pdfData.results.role = Array.isArray(results) ? results : [results];
+      } else if (operation === 'departments') {
+        pdfData.results.department = Array.isArray(results) ? results : [results];
+      } else if (operation === 'users') {
+        pdfData.results.user = Array.isArray(results) ? results : [results];
+      } else if (operation === 'deactivateUsers') {
+        pdfData.results.deactivation = Array.isArray(results) ? results : [results];
+      } else if (operation === 'unified') {
+        pdfData.results = results; // Already has role, department, user structure
+      }
+
+      const pdfResult = await post('/generate-audit-pdf', pdfData);
+
+      if (pdfResult.success) {
+        appendLog(`✓ PDF audit report generated: ${pdfResult.fileName}`);
+
+        // Add download button to the UI
+        showPDFDownloadButton(pdfResult.fileName, pdfResult.downloadUrl);
+      }
+    } catch (err) {
+      appendLog(`PDF generation failed: ${err.message}`);
+    }
+  }
+
+  function getOperationDisplayName(operation) {
+    const names = {
+      'roles': 'Role Creation',
+      'departments': 'Department Creation',
+      'users': 'User Creation',
+      'deactivateUsers': 'User Deactivation',
+      'unified': 'Complete Setup Flow'
+    };
+    return names[operation] || operation;
+  }
+
+  function showPDFDownloadButton(fileName, downloadUrl) {
+    const resultsSection = document.getElementById('resultsSection');
+
+    // Remove any existing PDF download button
+    const existingBtn = document.getElementById('pdfDownloadBtn');
+    if (existingBtn) {
+      existingBtn.remove();
+    }
+
+    // Create new download button
+    const downloadBtn = document.createElement('button');
+    downloadBtn.id = 'pdfDownloadBtn';
+    downloadBtn.className = 'pdf-download-btn';
+    downloadBtn.innerHTML = `
+      <span>📄</span>
+      Download Audit PDF
+    `;
+    downloadBtn.onclick = () => {
+      window.open(downloadUrl, '_blank');
+      appendLog(`Downloaded audit PDF: ${fileName}`);
+    };
+
+    resultsSection.insertBefore(downloadBtn, resultsSection.firstChild);
+  }
 
 });

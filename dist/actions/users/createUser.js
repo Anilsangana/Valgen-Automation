@@ -181,7 +181,8 @@ async function handleSuccessfulUserCreation(page, baseUrl, adminUsername, adminP
             email: user.Email,
             username: user.UserName,
             status: 'created-activated-and-verified',
-            loginVerified: true
+            loginVerified: true,
+            timestamp: new Date().toISOString()
         };
     }
     else {

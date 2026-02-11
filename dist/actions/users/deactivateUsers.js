@@ -27,7 +27,8 @@ async function deactivateUsers(page, baseUrl, adminUsername, adminPassword, user
                 results.push({
                     username,
                     status: 'deactivated',
-                    message: deactivationResult.message
+                    message: deactivationResult.message,
+                    timestamp: new Date().toISOString()
                 });
             }
             else {

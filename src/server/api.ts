@@ -7,6 +7,7 @@ import bodyParser from 'body-parser';
 import { runCreateRoles, runAll, runCreateUsers, runUnifiedFlow, runDeactivateUsers, runCreateDepartments } from './jobRunner';
 
 import { automationEvents } from '../core/browser';
+import { generateAuditPDF, getAuditReports } from '../utils/pdfGenerator';
 
 
 
@@ -256,6 +257,87 @@ app.post('/run/createDepartments', async (req, res) => {
   }
 });
 
+
+// ===================== PDF AUDIT TRAIL ENDPOINTS =====================
+
+/**
+ * Generate PDF audit trail from operation results
+ */
+app.post('/generate-audit-pdf', async (req, res) => {
+  try {
+    const { operation, adminUser, baseUrl, results } = req.body;
+
+    if (!operation || !adminUser || !baseUrl || !results) {
+      return res.status(400).json({
+        success: false,
+        message: 'Missing required fields: operation, adminUser, baseUrl, results'
+      });
+    }
+
+    const timestamp = new Date().toISOString();
+
+    automationEvents.emit('log', `Generating PDF audit report for: ${operation}`);
+
+    const pdfPath = await generateAuditPDF({
+      operation,
+      timestamp,
+      adminUser,
+      baseUrl,
+      results
+    });
+
+    const fileName = pdfPath.split(/[/\\]/).pop() || 'audit-report.pdf';
+
+    automationEvents.emit('log', `✓ PDF audit report generated: ${fileName}`);
+
+    res.json({
+      success: true,
+      message: 'PDF audit report generated successfully',
+      fileName,
+      downloadUrl: `/download-audit/${fileName}`
+    });
+
+  } catch (err) {
+    automationEvents.emit('error', `PDF generation failed: ${String(err)}`);
+    res.status(500).json({ success: false, message: String(err) });
+  }
+});
+
+/**
+ * Download audit PDF
+ */
+app.get('/download-audit/:fileName', (req, res) => {
+  try {
+    const { fileName } = req.params;
+    const filePath = path.join(process.cwd(), 'audit-reports', fileName);
+
+    if (!require('fs').existsSync(filePath)) {
+      return res.status(404).json({ success: false, message: 'File not found' });
+    }
+
+    res.download(filePath, fileName, (err) => {
+      if (err) {
+        automationEvents.emit('error', `PDF download failed: ${String(err)}`);
+        res.status(500).json({ success: false, message: String(err) });
+      }
+    });
+
+  } catch (err) {
+    res.status(500).json({ success: false, message: String(err) });
+  }
+});
+
+/**
+ * Get list of all audit reports
+ */
+app.get('/audit-reports', (req, res) => {
+  try {
+    const reports = getAuditReports();
+    res.json({ success: true, reports });
+  } catch (err) {
+    res.status(500).json({ success: false, message: String(err) });
+  }
+});
 
 
 

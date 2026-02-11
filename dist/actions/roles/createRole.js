@@ -125,7 +125,8 @@ async function createRole(page, roles, options = {}) {
             results.push({
                 role: r.roleName,
                 status: 'created',
-                popup: popupAppeared
+                popup: popupAppeared,
+                timestamp: new Date().toISOString()
             });
             await page.waitForTimeout(2000);
             // Close success popup

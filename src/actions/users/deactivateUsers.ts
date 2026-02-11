@@ -11,6 +11,7 @@ export interface DeactivateUserResult {
     username: string;
     status: 'deactivated' | 'failed' | 'error';
     message?: string;
+    timestamp?: string;
 }
 
 /**
@@ -47,7 +48,8 @@ export async function deactivateUsers(
                 results.push({
                     username,
                     status: 'deactivated',
-                    message: deactivationResult.message
+                    message: deactivationResult.message,
+                    timestamp: new Date().toISOString()
                 });
             } else {
                 automationEvents.emit('error', `Failed to deactivate user ${username}: ${deactivationResult.message}`);

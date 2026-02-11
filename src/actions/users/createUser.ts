@@ -42,6 +42,7 @@ export interface UserCreationResult {
   createdAs?: string;
   original?: string;
   message?: string;
+  timestamp?: string;
 }
 
 /**
@@ -288,7 +289,8 @@ async function handleSuccessfulUserCreation(
       email: user.Email,
       username: user.UserName,
       status: 'created-activated-and-verified',
-      loginVerified: true
+      loginVerified: true,
+      timestamp: new Date().toISOString()
     };
   } else {
     // Login failed - user is already on login page, no need to logout

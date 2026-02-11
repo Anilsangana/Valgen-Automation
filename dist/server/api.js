@@ -8,6 +8,7 @@ const path_1 = __importDefault(require("path"));
 const body_parser_1 = __importDefault(require("body-parser"));
 const jobRunner_1 = require("./jobRunner");
 const browser_1 = require("../core/browser");
+const pdfGenerator_1 = require("../utils/pdfGenerator");
 const app = (0, express_1.default)();
 app.use(body_parser_1.default.json());
 app.use(express_1.default.static(path_1.default.join(__dirname, '..', '..', 'src', 'ui')));
@@ -143,6 +144,75 @@ app.post('/run/createDepartments', async (req, res) => {
     }
     catch (err) {
         browser_1.automationEvents.emit('error', `Department creation failed: ${String(err)}`);
+        res.status(500).json({ success: false, message: String(err) });
+    }
+});
+// ===================== PDF AUDIT TRAIL ENDPOINTS =====================
+/**
+ * Generate PDF audit trail from operation results
+ */
+app.post('/generate-audit-pdf', async (req, res) => {
+    try {
+        const { operation, adminUser, baseUrl, results } = req.body;
+        if (!operation || !adminUser || !baseUrl || !results) {
+            return res.status(400).json({
+                success: false,
+                message: 'Missing required fields: operation, adminUser, baseUrl, results'
+            });
+        }
+        const timestamp = new Date().toISOString();
+        browser_1.automationEvents.emit('log', `Generating PDF audit report for: ${operation}`);
+        const pdfPath = await (0, pdfGenerator_1.generateAuditPDF)({
+            operation,
+            timestamp,
+            adminUser,
+            baseUrl,
+            results
+        });
+        const fileName = pdfPath.split(/[/\\]/).pop() || 'audit-report.pdf';
+        browser_1.automationEvents.emit('log', `✓ PDF audit report generated: ${fileName}`);
+        res.json({
+            success: true,
+            message: 'PDF audit report generated successfully',
+            fileName,
+            downloadUrl: `/download-audit/${fileName}`
+        });
+    }
+    catch (err) {
+        browser_1.automationEvents.emit('error', `PDF generation failed: ${String(err)}`);
+        res.status(500).json({ success: false, message: String(err) });
+    }
+});
+/**
+ * Download audit PDF
+ */
+app.get('/download-audit/:fileName', (req, res) => {
+    try {
+        const { fileName } = req.params;
+        const filePath = path_1.default.join(process.cwd(), 'audit-reports', fileName);
+        if (!require('fs').existsSync(filePath)) {
+            return res.status(404).json({ success: false, message: 'File not found' });
+        }
+        res.download(filePath, fileName, (err) => {
+            if (err) {
+                browser_1.automationEvents.emit('error', `PDF download failed: ${String(err)}`);
+                res.status(500).json({ success: false, message: String(err) });
+            }
+        });
+    }
+    catch (err) {
+        res.status(500).json({ success: false, message: String(err) });
+    }
+});
+/**
+ * Get list of all audit reports
+ */
+app.get('/audit-reports', (req, res) => {
+    try {
+        const reports = (0, pdfGenerator_1.getAuditReports)();
+        res.json({ success: true, reports });
+    }
+    catch (err) {
         res.status(500).json({ success: false, message: String(err) });
     }
 });

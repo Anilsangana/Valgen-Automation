@@ -325,7 +325,9 @@ export async function createRole(
 
         status: 'created',
 
-        popup: popupAppeared
+        popup: popupAppeared,
+
+        timestamp: new Date().toISOString()
 
       });
       await page.waitForTimeout(2000);

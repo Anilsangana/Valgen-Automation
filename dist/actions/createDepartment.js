@@ -79,7 +79,8 @@ async function createDepartment(page, departments, options = {}) {
             results.push({
                 department: d.name,
                 status: 'created',
-                popup: popupAppeared
+                popup: popupAppeared,
+                timestamp: new Date().toISOString()
             });
             await frame.locator('#btnMessageOk').click().catch(() => { });
         }

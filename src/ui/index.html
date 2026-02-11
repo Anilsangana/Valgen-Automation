@@ -10,20 +10,49 @@
   <link rel="icon" type="image/png" sizes="16x16" href="./favicon-16.png">
 
   <!-- Browser theme color -->
-  <meta name="theme-color" content="#0a0e27">
+  <meta name="theme-color" content="#0052A5">
 
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ValGenesis Admin Automation</title>
+  <title>Clinical Trial Management System</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 
 <body>
   <!-- Top Navigation Bar -->
   <header class="topbar">
-    <div class="brand">✦ ValGenesis Automation Console</div>
-    <div class="env-pill">
-      <span class="dot"></span> Connected
+    <div class="brand">
+      <div class="brand-icon">
+        <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+          <rect width="32" height="32" rx="6" fill="url(#gradient)" />
+          <path d="M16 8L12 16H20L16 24" stroke="white" stroke-width="2" stroke-linecap="round"
+            stroke-linejoin="round" />
+          <defs>
+            <linearGradient id="gradient" x1="0" y1="0" x2="32" y2="32">
+              <stop offset="0%" stop-color="#0052A5" />
+              <stop offset="100%" stop-color="#00A3E0" />
+            </linearGradient>
+          </defs>
+        </svg>
+      </div>
+      <div class="brand-text">
+        <div class="brand-name">CTMS</div>
+        <div class="brand-subtitle">Clinical Trial Management</div>
+      </div>
+    </div>
+    <div class="header-badges">
+      <div class="compliance-badge">
+        <span class="badge-icon">✓</span>
+        <span>GCP Compliant</span>
+      </div>
+      <div class="compliance-badge">
+        <span class="badge-icon">◉</span>
+        <span>21 CFR Part 11</span>
+      </div>
+      <div class="status-pill">
+        <span class="status-dot"></span>
+        <span>System Active</span>
+      </div>
     </div>
   </header>
 
@@ -32,11 +61,37 @@
 
     <!-- Hero Section -->
     <section class="card hero-card fade-in">
-      <h1>Administration Automation</h1>
+      <div class="hero-icon">
+        <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+          <circle cx="24" cy="24" r="20" stroke="url(#heroGradient)" stroke-width="2" />
+          <path d="M24 14V34M14 24H34" stroke="url(#heroGradient)" stroke-width="2" stroke-linecap="round" />
+          <defs>
+            <linearGradient id="heroGradient" x1="0" y1="0" x2="48" y2="48">
+              <stop offset="0%" stop-color="#0052A5" />
+              <stop offset="100%" stop-color="#00A3E0" />
+            </linearGradient>
+          </defs>
+        </svg>
+      </div>
+      <h1>User Management & Provisioning</h1>
       <p class="subtitle">
-        Securely execute administrative automation workflows with comprehensive audit history and live activity
-        tracking.
+        Automated user lifecycle management for clinical trial systems with full GCP compliance,
+        21 CFR Part 11 validation, and comprehensive audit trail documentation.
       </p>
+      <div class="hero-stats">
+        <div class="stat-item">
+          <div class="stat-number">100%</div>
+          <div class="stat-label">Audit Coverage</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-number">GCP</div>
+          <div class="stat-label">Compliant</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-number">24/7</div>
+          <div class="stat-label">Availability</div>
+        </div>
+      </div>
     </section>
 
     <!-- Main Content Grid -->
