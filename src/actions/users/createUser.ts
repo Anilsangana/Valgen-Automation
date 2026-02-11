@@ -1,29 +1,66 @@
 import { Page } from 'playwright';
 import { automationEvents } from '../../core/browser';
-import { waitForPostback, waitForOverlayGone } from '../../core/navigation';
 import { AdministrationPage } from '../../pages/administrationPage';
-import { createRole } from '../roles/createRole';
+import { login } from '../../core/login';
+import {
+  UserFormData,
+  fillUserCreationForm,
+  navigateToUserCreateForm
+} from './userFormFill';
+import {
+  completeUserSignup,
+  logoutAndNavigateToSignup
+} from './userSignup';
+import { activateUser } from './userActivation';
+import {
+  verifyUserLogin,
+  logoutAfterVerification
+} from './userVerification';
+import {
+  DuplicateStrategy,
+  checkForDuplicateOrSuccess,
+  handleDuplicatePopup,
+  retryWithModifiedCredentials
+} from './duplicateHandling';
+import {
+  submitUserCreationForm,
+  handleSuccessPopup
+} from './popupHandlers';
 
 export type CreateUserOptions = {
-  duplicateStrategy?: 'skip' | 'append' | 'stop';
+  duplicateStrategy?: DuplicateStrategy;
 };
 
+export interface UserCreationResult {
+  email: string;
+  username?: string;
+  status: string;
+  reason?: string;
+  error?: string;
+  loginVerified?: boolean;
+  loginError?: string;
+  createdAs?: string;
+  original?: string;
+  message?: string;
+}
+
+/**
+ * Main function to create users with complete workflow:
+ * 1. Fill admin form
+ * 2. Handle duplicates
+ * 3. Complete signup
+ * 4. Admin activation
+ * 5. Verify login
+ */
 export async function createUsers(
   page: Page,
-  users: Array<{
-    FirstName: string;
-    LastName: string;
-    UserName: string;
-    Email: string;
-    Password: string;
-    Role?: string;
-    Department?: string;
-    Comments?: string;
-  }>,
+  baseUrl: string,
+  adminUsername: string,
+  adminPassword: string,
+  users: Array<UserFormData>,
   options: CreateUserOptions = {}
-): Promise<any[]> {
-
-  const results: any[] = [];
+): Promise<UserCreationResult[]> {
+  const results: UserCreationResult[] = [];
   const admin = new AdministrationPage(page);
   const strategy = options.duplicateStrategy ?? 'skip';
 
@@ -33,217 +70,67 @@ export async function createUsers(
 
       // ===================== NAVIGATION =====================
       await admin.navigateToUserCreate();
-      await waitForOverlayGone(page);
+      const frame = await navigateToUserCreateForm(page);
 
-      const frame = page.frameLocator('#framecontent');
-
-      await frame.locator('#liCreateUser').click().catch(() => {});
-      await frame.locator('#divCreateUser').waitFor({ state: 'visible' });
-
-      // ===================== FORM =====================
-      if (u.Role) {
-            await page.waitForLoadState('domcontentloaded');
-            await frame.locator('#ddlRole').selectOption({ label: u.Role });
-          } else {
-            results.push({ email: u.Email, status: 'failed', message: `Required role '${u.Role}' not available and could not be created` });
-            continue;
-          }
-          // await page.waitForLoadState('networkidle');
-          await page.waitForTimeout(1000);
-          await page.waitForLoadState('domcontentloaded');
-
-      
-
-      if (u.Department) {
-        try {
-          await frame.locator('#ddlDepartment').selectOption({ label: u.Department });
-        } catch (err) {
-          automationEvents.emit('error', `Department '${u.Department}' not found in dropdown, skipping department selection`);
-        }
-      }
-          await page.waitForTimeout(1000);
-          await page.waitForLoadState('domcontentloaded');
-      await frame.locator('#txtFirstName').fill(u.FirstName);
-      automationEvents.emit('log', `Filled FirstName: ${u.FirstName}`);
-      await page.waitForTimeout(500);
-
-      await frame.locator('#txtLastName').fill(u.LastName);
-      automationEvents.emit('log', `Filled LastName: ${u.LastName}`);
-      await page.waitForTimeout(500);
-
-      await frame.locator('#txtUserName').fill(u.UserName);
-      automationEvents.emit('log', `Filled UserName: ${u.UserName}`);
-      await page.waitForTimeout(500);
-
-      await frame.locator('#txtEmail').fill(u.Email);
-      automationEvents.emit('log', `Filled Email: ${u.Email}`);
-      await page.waitForTimeout(500);
-
-      await frame.locator('#txtREEmail').fill(u.Email);
-      automationEvents.emit('log', `Filled Re-enter Email: ${u.Email}`);
-      await page.waitForTimeout(500);
-
-      await frame.locator('#txtPwd').fill(u.Password);
-      automationEvents.emit('log', `Filled Password: ${u.Password}`);
-      await page.waitForTimeout(500);
-
-      await frame.locator('#txtRPwd').fill(u.Password);
-      automationEvents.emit('log', `Filled Re-enter Password: ${u.Password}`);
-      await page.waitForTimeout(500);
-
-      if (u.Comments) {
-        await frame.locator('#txtComments').fill(u.Comments);
-      }
+      // ===================== FORM FILLING =====================
+      await fillUserCreationForm(page, frame, u);
 
       // ===================== SUBMIT =====================
-      automationEvents.emit('log', `Submitting user: ${u.Email}`);
-      await frame.locator('#btnUpdate').click();
-      await waitForPostback(page, 10000); // Wait for submit postback
+      await submitUserCreationForm(page, frame, u.Email);
 
       // ===================== POPUP DETECTION =====================
-      automationEvents.emit('log', 'Waiting for success or duplicate popup...');
+      const popupResult = await checkForDuplicateOrSuccess(page, frame, u.Email);
 
-      const duplicatePopup = frame.locator('#val1_lblErrorAlert');
-      const successPopup = frame.locator('#val1_pnlMessagePopup'); // success container
-      const duplicateOkBtn = frame.locator('#val1_btnerrorok');
+      // ===================== HANDLE DUPLICATE =====================
+      if (popupResult.isDuplicate) {
+        const duplicateResult = await handleDuplicateUser(
+          page,
+          frame,
+          baseUrl,
+          adminUsername,
+          adminPassword,
+          admin,
+          u,
+          strategy,
+          popupResult.message || ''
+        );
 
-      // Wait a bit for any popup to appear
-      await page.waitForTimeout(2000);
+        results.push(duplicateResult);
 
-      // Debug: Check what elements are visible
-      try {
-        const successVisible = await successPopup.isVisible();
-        const duplicateVisible = await duplicatePopup.isVisible();
-        automationEvents.emit('log', `Debug - Success popup visible: ${successVisible}, Duplicate popup visible: ${duplicateVisible}`);
-      } catch (err) {
-        automationEvents.emit('log', `Debug - Error checking visibility: ${String(err)}`);
-      }
-
-      // Check for success popup first (more common case)
-      let successDetected = false;
-      
-      // Try multiple possible success popup selectors
-      const successSelectors = [
-        '#val1_pnlMessagePopup', // original selector
-        '#val1_lblSuccessAlert', // alternative success message
-        '[id*="success"]', // any element with success in id
-        '[id*="Success"]', // any element with Success in id
-        '.success-message', // common success class
-        '.alert-success' // bootstrap success class
-      ];
-
-      for (const selector of successSelectors) {
-        try {
-          const popup = frame.locator(selector);
-          await popup.waitFor({ state: 'visible', timeout: 3000 });
-          successDetected = true;
-          automationEvents.emit('log', `Success popup detected using selector: ${selector} for user: ${u.Email}`);
-          break;
-        } catch (err) {
-          // Try next selector
-        }
-      }
-
-      // If still not found, try a more general approach
-      if (!successDetected) {
-        try {
-          // Look for any visible popup or message that might indicate success
-          const allPopups = frame.locator('[id*="popup"], [id*="Popup"], [id*="alert"], [id*="Alert"], [id*="message"], [id*="Message"]');
-          const count = await allPopups.count();
-          automationEvents.emit('log', `Found ${count} potential popup elements`);
-          
-          for (let i = 0; i < count; i++) {
-            const popup = allPopups.nth(i);
-            if (await popup.isVisible()) {
-              const text = await popup.innerText();
-              automationEvents.emit('log', `Found visible popup with text: ${text}`);
-              if (text.toLowerCase().includes('success') || text.toLowerCase().includes('created') || text.toLowerCase().includes('saved')) {
-                successDetected = true;
-                automationEvents.emit('log', `Success detected from popup text for user: ${u.Email}`);
-                break;
-              }
-            }
-          }
-        } catch (err) {
-          automationEvents.emit('log', `General popup search failed: ${String(err)}`);
-        }
-      }
-
-      if (!successDetected) {
-        automationEvents.emit('log', `Success popup not found with any selector for user: ${u.Email}`);
-      }
-
-      // If no success popup, check for duplicate popup
-      let duplicateDetected = false;
-      if (!successDetected) {
-        try {
-          await duplicatePopup.waitFor({ state: 'visible', timeout: 10000 });
-          duplicateDetected = true;
-          automationEvents.emit('log', `Duplicate popup detected for user: ${u.Email}`);
-        } catch (err) {
-          automationEvents.emit('log', `Duplicate popup not found within timeout: ${String(err)}`);
-          // No duplicate popup found
-        }
-      }
-
-      // ===================== DUPLICATE =====================
-      if (duplicateDetected) {
-        const msg = (await duplicatePopup.innerText()).trim();
-        automationEvents.emit('error', `Duplicate user detected: ${msg}`);
-
-        await duplicateOkBtn.click().catch(() => {});
-
-        if (strategy === 'stop') {
-          results.push({ email: u.Email, status: 'failed', reason: msg });
-          break;
-        }
-
-        if (strategy === 'append') {
-          const suffix = Date.now().toString().slice(-4);
-          const newUser = `${u.UserName}_${suffix}`;
-          const newEmail = u.Email.replace('@', `_${suffix}@`);
-
-          automationEvents.emit('log', `Retrying with ${newEmail}`);
-
-          await frame.locator('#txtUserName').fill(newUser);
-          await frame.locator('#txtEmail').fill(newEmail);
-          await frame.locator('#txtREEmail').fill(newEmail);
-          await frame.locator('#btnUpdate').click();
-
-          await successPopup.waitFor({ state: 'visible', timeout: 8000 });
-
-          results.push({
-            original: u.Email,
-            createdAs: newEmail,
-            status: 'created-appended'
-          });
+        if (strategy === 'stop' || duplicateResult.status === 'skipped') {
+          if (strategy === 'stop') break;
           continue;
         }
-        results.push({ email: u.Email, status: 'skipped', reason: msg });
         continue;
       }
 
-      // ===================== SUCCESS =====================
-      if (successDetected) {
-        automationEvents.emit('log', `User created successfully: ${u.Email}`);
-        results.push({ email: u.Email, status: 'created' });
+      // ===================== HANDLE SUCCESS =====================
+      if (popupResult.isSuccess) {
+        await handleSuccessPopup(page, frame, u.Email);
+
+        const successResult = await handleSuccessfulUserCreation(
+          page,
+          baseUrl,
+          adminUsername,
+          adminPassword,
+          admin,
+          u
+        );
+
+        results.push(successResult);
         continue;
       }
 
-      // ===================== NOTHING =====================
+      // ===================== NO POPUP DETECTED =====================
       automationEvents.emit('error', `No popup detected for user: ${u.Email}`);
       results.push({
         email: u.Email,
         status: 'error',
-        message: 'No success or duplicate popup detected'
+        message: popupResult.message || 'No success or duplicate popup detected'
       });
 
     } catch (err) {
-      automationEvents.emit(
-        'error',
-        `createUsers error for ${u.Email}: ${String(err)}`
-      );
-
+      automationEvents.emit('error', `createUsers error for ${u.Email}: ${String(err)}`);
       results.push({
         email: u.Email,
         status: 'error',
@@ -253,4 +140,165 @@ export async function createUsers(
   }
 
   return results;
+}
+
+/**
+ * Handle duplicate user scenario based on strategy
+ */
+async function handleDuplicateUser(
+  page: Page,
+  frame: any,
+  baseUrl: string,
+  adminUsername: string,
+  adminPassword: string,
+  admin: AdministrationPage,
+  user: UserFormData,
+  strategy: DuplicateStrategy,
+  errorMessage: string
+): Promise<UserCreationResult> {
+  automationEvents.emit('error', `Duplicate user detected: ${errorMessage}`);
+  await handleDuplicatePopup(frame);
+
+  if (strategy === 'stop') {
+    return {
+      email: user.Email,
+      status: 'failed',
+      reason: errorMessage
+    };
+  }
+
+  if (strategy === 'append') {
+    const { newUser, newEmail } = await retryWithModifiedCredentials(page, frame, user);
+
+    // Complete the full workflow for the modified user
+    await logoutAndNavigateToSignup(page, newUser);
+
+    const modifiedUser = { ...user, UserName: newUser, Email: newEmail };
+    const signupResult = await completeUserSignup(page, modifiedUser);
+
+    if (!signupResult.success) {
+      return {
+        email: user.Email,
+        username: newUser,
+        status: 'signup-failed',
+        error: signupResult.message
+      };
+    }
+
+    // Admin login and activate
+    const adminLoginResult = await login(page, baseUrl, adminUsername, adminPassword);
+    if (!adminLoginResult.success) {
+      return {
+        email: user.Email,
+        username: newUser,
+        status: 'signup-complete-but-admin-login-failed',
+        error: adminLoginResult.message
+      };
+    }
+
+    const activationResult = await activateUser(page, admin, newUser);
+    if (!activationResult.success) {
+      return {
+        email: user.Email,
+        username: newUser,
+        status: 'activation-failed',
+        error: activationResult.message
+      };
+    }
+
+    return {
+      email: newEmail,
+      original: user.Email,
+      createdAs: newEmail,
+      username: newUser,
+      status: 'created-appended'
+    };
+  }
+
+  // Default: skip
+  return {
+    email: user.Email,
+    status: 'skipped',
+    reason: errorMessage
+  };
+}
+
+/**
+ * Handle successful user creation - complete signup, activation, and verification
+ */
+async function handleSuccessfulUserCreation(
+  page: Page,
+  baseUrl: string,
+  adminUsername: string,
+  adminPassword: string,
+  admin: AdministrationPage,
+  user: UserFormData
+): Promise<UserCreationResult> {
+  // ===================== LOGOUT AND START SIGNUP =====================
+  await logoutAndNavigateToSignup(page, user.UserName);
+
+  // ===================== COMPLETE SIGNUP PROCESS =====================
+  const signupResult = await completeUserSignup(page, user);
+
+  if (!signupResult.success) {
+    return {
+      email: user.Email,
+      username: user.UserName,
+      status: 'signup-failed',
+      error: signupResult.message
+    };
+  }
+
+  // ===================== ADMIN LOGIN TO APPROVE USER =====================
+  automationEvents.emit('log', `Starting admin login to approve user: ${user.UserName}`);
+  const adminLoginResult = await login(page, baseUrl, adminUsername, adminPassword);
+
+  if (!adminLoginResult.success) {
+    automationEvents.emit('error', `Admin login failed for approving user ${user.UserName}: ${adminLoginResult.message}`);
+    return {
+      email: user.Email,
+      username: user.UserName,
+      status: 'signup-complete-but-admin-login-failed',
+      error: adminLoginResult.message
+    };
+  }
+
+  automationEvents.emit('log', `✓ Admin logged in successfully, proceeding to approve user: ${user.UserName}`);
+  await page.waitForLoadState('networkidle');
+
+  // ===================== USER ACTIVATION PROCESS =====================
+  const activationResult = await activateUser(page, admin, user.UserName);
+
+  if (!activationResult.success) {
+    return {
+      email: user.Email,
+      username: user.UserName,
+      status: 'activation-failed',
+      error: activationResult.message
+    };
+  }
+
+  // ===================== VERIFY NEW USER LOGIN =====================
+  const verificationResult = await verifyUserLogin(page, baseUrl, user.UserName, user.Password);
+
+  if (verificationResult.loginVerified) {
+    // User successfully logged in, now logout
+    await logoutAfterVerification(page);
+    return {
+      email: user.Email,
+      username: user.UserName,
+      status: 'created-activated-and-verified',
+      loginVerified: true
+    };
+  } else {
+    // Login failed - user is already on login page, no need to logout
+    automationEvents.emit('log', `User ${user.UserName} login verification failed, user is already logged out`);
+    return {
+      email: user.Email,
+      username: user.UserName,
+      status: 'activated-but-login-failed',
+      loginVerified: false,
+      loginError: verificationResult.message
+    };
+  }
 }

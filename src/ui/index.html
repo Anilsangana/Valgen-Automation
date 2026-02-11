@@ -1,87 +1,114 @@
 <!doctype html>
 <html>
+
 <head>
+  <!-- Favicon -->
+  <link rel="icon" type="image/svg+xml" href="./favicon.svg">
+
+  <!-- Fallback (optional but recommended later) -->
+  <link rel="icon" type="image/png" sizes="32x32" href="./favicon-32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="./favicon-16.png">
+
+  <!-- Browser theme color -->
+  <meta name="theme-color" content="#0a0e27">
+
   <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ValGenesis Admin Automation</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 
 <body>
-  <div class="topbar">
-    <div class="brand">ValGenesis Automation Console</div>
+  <!-- Top Navigation Bar -->
+  <header class="topbar">
+    <div class="brand">✦ ValGenesis Automation Console</div>
     <div class="env-pill">
       <span class="dot"></span> Connected
     </div>
-  </div>
+  </header>
 
-  <div class="container">
+  <!-- Main Container -->
+  <main class="container">
 
-    <div class="card hero-card">
+    <!-- Hero Section -->
+    <section class="card hero-card fade-in">
       <h1>Administration Automation</h1>
       <p class="subtitle">
-        Securely execute administrative automation workflows with audit history and live activity tracking.
+        Securely execute administrative automation workflows with comprehensive audit history and live activity
+        tracking.
       </p>
-    </div>
+    </section>
 
+    <!-- Main Content Grid -->
     <div class="grid-2">
 
-      <!-- SETTINGS -->
-      <section class="card">
-        <h2>Connection Settings</h2>
+      <!-- Settings Panel -->
+      <section class="card fade-in">
+        <h2>⚙️ Connection Settings</h2>
 
-        <label>Base URL
-          <input id="baseUrl"
-            value="https://vgusdev01.valgenesis.net/PIHEALTH-DEV/login/login.aspx?ReturnUrl=/PIHEALTH-DEV/default.aspx">
-        </label>
+        <label>Base URL</label>
+        <input id="baseUrl" type="url" placeholder="https://vgusdev01.valgenesis.net/..."
+          value="https://vgusdev01.valgenesis.net/PIHEALTH-DEV/login/login.aspx?ReturnUrl=/PIHEALTH-DEV/default.aspx">
 
         <div class="grid-3">
-          <label>Username
-            <input id="username">
-          </label>
+          <div>
+            <label>Username</label>
+            <input id="username" placeholder="Enter username" type="text">
+          </div>
 
-          <label>Password
-            <input id="password" type="password">
-          </label>
+          <div>
+            <label>Password</label>
+            <input id="password" placeholder="Enter password" type="password">
+          </div>
         </div>
 
-        <label>Choose Functionality</label>
-<select id="featureSelect">
-  <option value="">-- Select Functionality --</option>
-  <option value="roles">Create Roles</option>
-  <option value="users">Create Users</option>
-  <option value="assign">Assign Roles to Users</option>
-  <option value="departments">Create Departments</option>
-</select>
+        <label>Select Functionality</label>
+        <select id="featureSelect">
+          <option value="">-- Choose an Option --</option>
+          <option value="roles">🔐 Create Role</option>
+          <option value="departments">🏢 Create Department</option>
+          <option value="users">👤 Create User</option>
+          <option value="deactivateUsers">🚫 Deactivate User</option>
+          <option value="unified">⚡ Complete Setup (Role → Dept → User → Deactivate)</option>
+        </select>
 
-<div id="featureInputs" class="dynamic-box"></div>
+        <!-- Dynamic Input Container -->
+        <div id="featureInputs" class="dynamic-box"></div>
 
-<div class="buttons">
-  <button class="primary" id="btnRun"><span class="spinner"></span> Run</button>
-</div>
+        <!-- Action Buttons -->
+        <div class="buttons">
+          <button class="primary" id="btnRun">
+            <span class="spinner"></span>Run Automation
+          </button>
+        </div>
 
       </section>
 
-      <!-- LOGS -->
-      <section class="card">
-        <h2>Live Execution Logs</h2>
+      <!-- Live Logs Panel -->
+      <section class="card fade-in">
+        <h2>📊 Live Execution Logs</h2>
         <pre id="logArea" class="log"></pre>
       </section>
 
     </div>
 
-      <!-- RESULTS -->
-      <section class="card" id="resultsSection" style="display:none;">
-        <h2>Creation Results</h2>
-        <div id="resultsList"></div>
-      </section>
+    <!-- Results Section (Hidden by default) -->
+    <section class="card" id="resultsSection" style="display:none;">
+      <h2>✓ Creation Results</h2>
+      <div id="resultsList"></div>
+    </section>
 
-  </div>
+  </main>
 
+  <!-- Footer -->
   <footer class="footer">
-    © 2026 | ValGenesis Admin Automation | Secure Execution Framework
+    <div>© 2026 | ValGenesis Admin Automation | Secure Execution Framework</div>
+    <div style="font-size: 11px; margin-top: 8px; opacity: 0.7;">Last Updated: January 2026</div>
   </footer>
 
+  <!-- Application Script -->
   <script src="app.js" defer></script>
 
 </body>
+
 </html>

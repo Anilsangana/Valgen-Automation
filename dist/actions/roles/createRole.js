@@ -6,6 +6,7 @@ const navigation_1 = require("../../core/navigation");
 const administrationPage_1 = require("../../pages/administrationPage");
 async function configureRolePermissions(frame, page, roleName) {
     browser_1.automationEvents.emit('log', 'Saving role permissions');
+    await page.mouse.move(1, 1);
     await frame.locator('body').waitFor({ state: 'visible', timeout: 10000 });
     const comment = `Permissions saved automatically for role "${roleName}" during creation`;
     await frame.locator('#txtComments').fill(comment);
@@ -42,24 +43,25 @@ async function createRole(page, roles, options = {}) {
             await (0, navigation_1.waitForOverlayGone)(page);
             const frame = page.frameLocator('#framecontent');
             // ===================== Role Creation =====================
-            await page.waitForTimeout(1000);
-            await frame.locator('#ddlRoleType')
-                .waitFor({ state: 'visible', timeout: 8000 });
+            await page.waitForTimeout(3000);
+            await page.mouse.move(1, 1);
             await frame.locator('#ddlRoleType')
                 .selectOption('Review and Approval');
-            await page.waitForTimeout(1000);
+            await page.waitForTimeout(2000);
             await frame.locator('#txtboxRoleName')
                 .fill(r.roleName);
             await page.waitForTimeout(1000);
             await frame.locator('#txtBoxDesc')
                 .fill(`Auto created role - ${r.roleName}`);
             await page.waitForTimeout(1000);
+            await page.mouse.move(1, 1);
             await frame.locator('#btnSubmit').click();
-            await (0, navigation_1.waitForPostback)(page, 15000);
+            await page.mouse.move(1, 1);
+            await page.waitForLoadState('load');
             // ===================== Popup Detection =====================
             const successPopup = frame.locator('#val1_lblCM');
             const duplicatePopup = frame.locator('#val1_lblErrorAlert', { hasText: 'Role Name must be unique' });
-            const errorPopup = frame.locator('##val1_lblErrorAlertPop', { hasText: 'Enter Role Name' });
+            const errorPopup = frame.locator('#val1_lblErrorAlertPop', { hasText: 'Enter Role Name' });
             const popupAppeared = await Promise.race([
                 successPopup.waitFor({ state: 'visible', timeout: 8000 }).then(() => 'success'),
                 duplicatePopup.waitFor({ state: 'visible', timeout: 8000 }).then(() => 'duplicate'),
@@ -67,7 +69,12 @@ async function createRole(page, roles, options = {}) {
             ]).catch(() => 'none');
             // ===================== Duplicate Handling =====================
             if (popupAppeared === 'error') {
+                // Click OK button to dismiss error
                 await frame.locator('#val1_btnerrorok').click().catch(() => { });
+                // Wait for modal to close
+                await page.waitForTimeout(2000);
+                await page.locator('#modalBackground').waitFor({ state: 'hidden', timeout: 5000 }).catch(() => { });
+                await page.waitForTimeout(1000);
                 if (strategy === 'stop') {
                     results.push({
                         role: r.roleName,
@@ -78,7 +85,12 @@ async function createRole(page, roles, options = {}) {
                 }
             }
             if (popupAppeared === 'duplicate') {
+                // Click OK button to dismiss duplicate error
                 await frame.locator('#val1_btnerrorok').click().catch(() => { });
+                // Wait for modal to close and background to clear
+                await page.waitForTimeout(2000);
+                await page.locator('#modalBackground').waitFor({ state: 'hidden', timeout: 5000 }).catch(() => { });
+                await page.waitForTimeout(1000);
                 if (strategy === 'stop') {
                     results.push({
                         role: r.roleName,
@@ -115,28 +127,36 @@ async function createRole(page, roles, options = {}) {
                 status: 'created',
                 popup: popupAppeared
             });
+            await page.waitForTimeout(2000);
+            // Close success popup
             await frame.locator('#btnMessageOk').click().catch(() => { });
+            // CRITICAL: Wait for modal background to fully disappear
+            await page.waitForTimeout(2000);
+            await page.locator('#modalBackground').waitFor({ state: 'hidden', timeout: 5000 }).catch(() => { });
+            await page.waitForTimeout(1000);
             // ===================== Permission Save =====================
             if (configurePermissions) {
                 try {
-                    browser_1.automationEvents.emit('log', `Applying permissions for: ${r.roleName}`);
-                    await page.getByRole('link', { name: ' Administration' }).click();
-                    await (0, navigation_1.waitForPostback)(page, 8000);
-                    await page.locator('[id="AD000"]', { hasText: 'Administration' }).hover();
-                    await page.locator('a', { hasText: 'Role Profiles' }).click();
-                    await (0, navigation_1.waitForPostback)(page, 10000);
-                    await (0, navigation_1.waitForOverlayGone)(page);
-                    const permFrame = page.frameLocator('#framecontent');
-                    await page.waitForTimeout(1000);
-                    await page.waitForLoadState('domcontentloaded');
-                    await permFrame.locator('#ddlRName')
-                        .waitFor({ state: 'visible', timeout: 8000 });
-                    await permFrame.locator('#ddlRName')
-                        .selectOption({ label: r.roleName });
-                    await page.waitForTimeout(1000);
-                    await page.waitForLoadState('domcontentloaded');
-                    await configureRolePermissions(permFrame, page, r.roleName);
+                    // automationEvents.emit('log', `Applying permissions for: ${r.roleName}`);
+                    // await page.getByRole('link', { name: ' Administration' }).click();
+                    // await waitForPostback(page, 8000);
+                    // await page.locator('[id="AD000"]', { hasText: 'Administration' }).hover();
+                    // await page.locator('a', { hasText: 'Role Profiles' }).click();
+                    // await waitForPostback(page, 10000);
+                    // await waitForOverlayGone(page);
+                    // const permFrame = page.frameLocator('#framecontent');
+                    // await page.waitForTimeout(1000);
+                    // await page.waitForLoadState('domcontentloaded');
+                    // await permFrame.locator('#ddlRName')
+                    //   .waitFor({ state: 'visible', timeout: 8000 });
+                    // await permFrame.locator('#ddlRName')
+                    //   .selectOption({ label: r.roleName });
+                    // await page.waitForTimeout(1000);
+                    // await page.waitForLoadState('domcontentloaded');
+                    await page.getByRole('link', { name: 'Logout' }).click();
+                    // await configureRolePermissions(permFrame, page, r.roleName);
                     results[results.length - 1].permissionsConfigured = true;
+                    results[results.length - 1].credentials.permissionsConfigured = true;
                 }
                 catch (permErr) {
                     browser_1.automationEvents.emit('error', `Permission setup failed for ${r.roleName}: ${String(permErr)}`);

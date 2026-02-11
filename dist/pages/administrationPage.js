@@ -14,6 +14,10 @@ class AdministrationPage {
         this.roleCreationButton = page.getByRole('link', {
             name: 'Role Create Roles to manage access to functionality and data'
         });
+        // Department Create menu link
+        this.departmentCreationButton = page.getByRole('link', {
+            name: 'Department Create Departments to identify division of an organization'
+        });
     }
     async navigateToAdministration() {
         await this.administratorButton.click();
@@ -33,6 +37,17 @@ class AdministrationPage {
         await Promise.all([
             this.page.waitForLoadState('load'),
             this.userCreationButton.click()
+        ]);
+        await this.page.waitForTimeout(800);
+    }
+    async navigateToDepartmentCreate() {
+        await this.administratorButton.click();
+        await this.page.waitForLoadState('load');
+        await this.createTab.hover();
+        await this.page.waitForTimeout(400);
+        await Promise.all([
+            this.page.waitForLoadState('load'),
+            this.departmentCreationButton.click()
         ]);
         await this.page.waitForTimeout(800);
     }

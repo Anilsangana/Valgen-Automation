@@ -24,5 +24,19 @@ export class LoginPage {
     await this.passwordInput.fill(password);
     await this.loginButton.click();
     await this.page.waitForLoadState('networkidle');
+    if (await this.page.getByRole('link', { name: 'ok' }).isVisible()) {
+      await this.page.getByRole('link', { name: 'ok' }).click();
+    }
+  }
+
+  async loginWithNewUser(username: string, password: string) {
+    await this.usernameInput.fill(username);
+    await this.passwordInput.fill(password);
+    await this.page.locator('[name="ddlSetTimeZone"]').selectOption('(UTC+05:30) Chennai, Kolkata, Mumbai, New Delhi');
+    await this.loginButton.click();
+    await this.page.waitForLoadState('networkidle');
+    if (await this.page.getByRole('link', { name: 'ok' }).isVisible()) {
+      await this.page.getByRole('link', { name: 'ok' }).click();
+    }
   }
 }

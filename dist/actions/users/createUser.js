@@ -2,9 +2,23 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.createUsers = createUsers;
 const browser_1 = require("../../core/browser");
-const navigation_1 = require("../../core/navigation");
 const administrationPage_1 = require("../../pages/administrationPage");
-async function createUsers(page, users, options = {}) {
+const login_1 = require("../../core/login");
+const userFormFill_1 = require("./userFormFill");
+const userSignup_1 = require("./userSignup");
+const userActivation_1 = require("./userActivation");
+const userVerification_1 = require("./userVerification");
+const duplicateHandling_1 = require("./duplicateHandling");
+const popupHandlers_1 = require("./popupHandlers");
+/**
+ * Main function to create users with complete workflow:
+ * 1. Fill admin form
+ * 2. Handle duplicates
+ * 3. Complete signup
+ * 4. Admin activation
+ * 5. Verify login
+ */
+async function createUsers(page, baseUrl, adminUsername, adminPassword, users, options = {}) {
     const results = [];
     const admin = new administrationPage_1.AdministrationPage(page);
     const strategy = options.duplicateStrategy ?? 'skip';
@@ -13,180 +27,37 @@ async function createUsers(page, users, options = {}) {
             browser_1.automationEvents.emit('log', `Processing user: ${u.Email}`);
             // ===================== NAVIGATION =====================
             await admin.navigateToUserCreate();
-            await (0, navigation_1.waitForOverlayGone)(page);
-            const frame = page.frameLocator('#framecontent');
-            await frame.locator('#liCreateUser').click().catch(() => { });
-            await frame.locator('#divCreateUser').waitFor({ state: 'visible' });
-            // ===================== FORM =====================
-            if (u.Role) {
-                await page.waitForLoadState('domcontentloaded');
-                await frame.locator('#ddlRole').selectOption({ label: u.Role });
-            }
-            else {
-                results.push({ email: u.Email, status: 'failed', message: `Required role '${u.Role}' not available and could not be created` });
-                continue;
-            }
-            // await page.waitForLoadState('networkidle');
-            await page.waitForTimeout(1000);
-            await page.waitForLoadState('domcontentloaded');
-            if (u.Department) {
-                try {
-                    await frame.locator('#ddlDepartment').selectOption({ label: u.Department });
-                }
-                catch (err) {
-                    browser_1.automationEvents.emit('error', `Department '${u.Department}' not found in dropdown, skipping department selection`);
-                }
-            }
-            await page.waitForTimeout(1000);
-            await page.waitForLoadState('domcontentloaded');
-            await frame.locator('#txtFirstName').fill(u.FirstName);
-            browser_1.automationEvents.emit('log', `Filled FirstName: ${u.FirstName}`);
-            await page.waitForTimeout(500);
-            await frame.locator('#txtLastName').fill(u.LastName);
-            browser_1.automationEvents.emit('log', `Filled LastName: ${u.LastName}`);
-            await page.waitForTimeout(500);
-            await frame.locator('#txtUserName').fill(u.UserName);
-            browser_1.automationEvents.emit('log', `Filled UserName: ${u.UserName}`);
-            await page.waitForTimeout(500);
-            await frame.locator('#txtEmail').fill(u.Email);
-            browser_1.automationEvents.emit('log', `Filled Email: ${u.Email}`);
-            await page.waitForTimeout(500);
-            await frame.locator('#txtREEmail').fill(u.Email);
-            browser_1.automationEvents.emit('log', `Filled Re-enter Email: ${u.Email}`);
-            await page.waitForTimeout(500);
-            await frame.locator('#txtPwd').fill(u.Password);
-            browser_1.automationEvents.emit('log', `Filled Password: ${u.Password}`);
-            await page.waitForTimeout(500);
-            await frame.locator('#txtRPwd').fill(u.Password);
-            browser_1.automationEvents.emit('log', `Filled Re-enter Password: ${u.Password}`);
-            await page.waitForTimeout(500);
-            if (u.Comments) {
-                await frame.locator('#txtComments').fill(u.Comments);
-            }
+            const frame = await (0, userFormFill_1.navigateToUserCreateForm)(page);
+            // ===================== FORM FILLING =====================
+            await (0, userFormFill_1.fillUserCreationForm)(page, frame, u);
             // ===================== SUBMIT =====================
-            browser_1.automationEvents.emit('log', `Submitting user: ${u.Email}`);
-            await frame.locator('#btnUpdate').click();
-            await (0, navigation_1.waitForPostback)(page, 10000); // Wait for submit postback
+            await (0, popupHandlers_1.submitUserCreationForm)(page, frame, u.Email);
             // ===================== POPUP DETECTION =====================
-            browser_1.automationEvents.emit('log', 'Waiting for success or duplicate popup...');
-            const duplicatePopup = frame.locator('#val1_lblErrorAlert');
-            const successPopup = frame.locator('#val1_pnlMessagePopup'); // success container
-            const duplicateOkBtn = frame.locator('#val1_btnerrorok');
-            // Wait a bit for any popup to appear
-            await page.waitForTimeout(2000);
-            // Debug: Check what elements are visible
-            try {
-                const successVisible = await successPopup.isVisible();
-                const duplicateVisible = await duplicatePopup.isVisible();
-                browser_1.automationEvents.emit('log', `Debug - Success popup visible: ${successVisible}, Duplicate popup visible: ${duplicateVisible}`);
-            }
-            catch (err) {
-                browser_1.automationEvents.emit('log', `Debug - Error checking visibility: ${String(err)}`);
-            }
-            // Check for success popup first (more common case)
-            let successDetected = false;
-            // Try multiple possible success popup selectors
-            const successSelectors = [
-                '#val1_pnlMessagePopup', // original selector
-                '#val1_lblSuccessAlert', // alternative success message
-                '[id*="success"]', // any element with success in id
-                '[id*="Success"]', // any element with Success in id
-                '.success-message', // common success class
-                '.alert-success' // bootstrap success class
-            ];
-            for (const selector of successSelectors) {
-                try {
-                    const popup = frame.locator(selector);
-                    await popup.waitFor({ state: 'visible', timeout: 3000 });
-                    successDetected = true;
-                    browser_1.automationEvents.emit('log', `Success popup detected using selector: ${selector} for user: ${u.Email}`);
-                    break;
-                }
-                catch (err) {
-                    // Try next selector
-                }
-            }
-            // If still not found, try a more general approach
-            if (!successDetected) {
-                try {
-                    // Look for any visible popup or message that might indicate success
-                    const allPopups = frame.locator('[id*="popup"], [id*="Popup"], [id*="alert"], [id*="Alert"], [id*="message"], [id*="Message"]');
-                    const count = await allPopups.count();
-                    browser_1.automationEvents.emit('log', `Found ${count} potential popup elements`);
-                    for (let i = 0; i < count; i++) {
-                        const popup = allPopups.nth(i);
-                        if (await popup.isVisible()) {
-                            const text = await popup.innerText();
-                            browser_1.automationEvents.emit('log', `Found visible popup with text: ${text}`);
-                            if (text.toLowerCase().includes('success') || text.toLowerCase().includes('created') || text.toLowerCase().includes('saved')) {
-                                successDetected = true;
-                                browser_1.automationEvents.emit('log', `Success detected from popup text for user: ${u.Email}`);
-                                break;
-                            }
-                        }
-                    }
-                }
-                catch (err) {
-                    browser_1.automationEvents.emit('log', `General popup search failed: ${String(err)}`);
-                }
-            }
-            if (!successDetected) {
-                browser_1.automationEvents.emit('log', `Success popup not found with any selector for user: ${u.Email}`);
-            }
-            // If no success popup, check for duplicate popup
-            let duplicateDetected = false;
-            if (!successDetected) {
-                try {
-                    await duplicatePopup.waitFor({ state: 'visible', timeout: 10000 });
-                    duplicateDetected = true;
-                    browser_1.automationEvents.emit('log', `Duplicate popup detected for user: ${u.Email}`);
-                }
-                catch (err) {
-                    browser_1.automationEvents.emit('log', `Duplicate popup not found within timeout: ${String(err)}`);
-                    // No duplicate popup found
-                }
-            }
-            // ===================== DUPLICATE =====================
-            if (duplicateDetected) {
-                const msg = (await duplicatePopup.innerText()).trim();
-                browser_1.automationEvents.emit('error', `Duplicate user detected: ${msg}`);
-                await duplicateOkBtn.click().catch(() => { });
-                if (strategy === 'stop') {
-                    results.push({ email: u.Email, status: 'failed', reason: msg });
-                    break;
-                }
-                if (strategy === 'append') {
-                    const suffix = Date.now().toString().slice(-4);
-                    const newUser = `${u.UserName}_${suffix}`;
-                    const newEmail = u.Email.replace('@', `_${suffix}@`);
-                    browser_1.automationEvents.emit('log', `Retrying with ${newEmail}`);
-                    await frame.locator('#txtUserName').fill(newUser);
-                    await frame.locator('#txtEmail').fill(newEmail);
-                    await frame.locator('#txtREEmail').fill(newEmail);
-                    await frame.locator('#btnUpdate').click();
-                    await successPopup.waitFor({ state: 'visible', timeout: 8000 });
-                    results.push({
-                        original: u.Email,
-                        createdAs: newEmail,
-                        status: 'created-appended'
-                    });
+            const popupResult = await (0, duplicateHandling_1.checkForDuplicateOrSuccess)(page, frame, u.Email);
+            // ===================== HANDLE DUPLICATE =====================
+            if (popupResult.isDuplicate) {
+                const duplicateResult = await handleDuplicateUser(page, frame, baseUrl, adminUsername, adminPassword, admin, u, strategy, popupResult.message || '');
+                results.push(duplicateResult);
+                if (strategy === 'stop' || duplicateResult.status === 'skipped') {
+                    if (strategy === 'stop')
+                        break;
                     continue;
                 }
-                results.push({ email: u.Email, status: 'skipped', reason: msg });
                 continue;
             }
-            // ===================== SUCCESS =====================
-            if (successDetected) {
-                browser_1.automationEvents.emit('log', `User created successfully: ${u.Email}`);
-                results.push({ email: u.Email, status: 'created' });
+            // ===================== HANDLE SUCCESS =====================
+            if (popupResult.isSuccess) {
+                await (0, popupHandlers_1.handleSuccessPopup)(page, frame, u.Email);
+                const successResult = await handleSuccessfulUserCreation(page, baseUrl, adminUsername, adminPassword, admin, u);
+                results.push(successResult);
                 continue;
             }
-            // ===================== NOTHING =====================
+            // ===================== NO POPUP DETECTED =====================
             browser_1.automationEvents.emit('error', `No popup detected for user: ${u.Email}`);
             results.push({
                 email: u.Email,
                 status: 'error',
-                message: 'No success or duplicate popup detected'
+                message: popupResult.message || 'No success or duplicate popup detected'
             });
         }
         catch (err) {
@@ -199,4 +70,129 @@ async function createUsers(page, users, options = {}) {
         }
     }
     return results;
+}
+/**
+ * Handle duplicate user scenario based on strategy
+ */
+async function handleDuplicateUser(page, frame, baseUrl, adminUsername, adminPassword, admin, user, strategy, errorMessage) {
+    browser_1.automationEvents.emit('error', `Duplicate user detected: ${errorMessage}`);
+    await (0, duplicateHandling_1.handleDuplicatePopup)(frame);
+    if (strategy === 'stop') {
+        return {
+            email: user.Email,
+            status: 'failed',
+            reason: errorMessage
+        };
+    }
+    if (strategy === 'append') {
+        const { newUser, newEmail } = await (0, duplicateHandling_1.retryWithModifiedCredentials)(page, frame, user);
+        // Complete the full workflow for the modified user
+        await (0, userSignup_1.logoutAndNavigateToSignup)(page, newUser);
+        const modifiedUser = { ...user, UserName: newUser, Email: newEmail };
+        const signupResult = await (0, userSignup_1.completeUserSignup)(page, modifiedUser);
+        if (!signupResult.success) {
+            return {
+                email: user.Email,
+                username: newUser,
+                status: 'signup-failed',
+                error: signupResult.message
+            };
+        }
+        // Admin login and activate
+        const adminLoginResult = await (0, login_1.login)(page, baseUrl, adminUsername, adminPassword);
+        if (!adminLoginResult.success) {
+            return {
+                email: user.Email,
+                username: newUser,
+                status: 'signup-complete-but-admin-login-failed',
+                error: adminLoginResult.message
+            };
+        }
+        const activationResult = await (0, userActivation_1.activateUser)(page, admin, newUser);
+        if (!activationResult.success) {
+            return {
+                email: user.Email,
+                username: newUser,
+                status: 'activation-failed',
+                error: activationResult.message
+            };
+        }
+        return {
+            email: newEmail,
+            original: user.Email,
+            createdAs: newEmail,
+            username: newUser,
+            status: 'created-appended'
+        };
+    }
+    // Default: skip
+    return {
+        email: user.Email,
+        status: 'skipped',
+        reason: errorMessage
+    };
+}
+/**
+ * Handle successful user creation - complete signup, activation, and verification
+ */
+async function handleSuccessfulUserCreation(page, baseUrl, adminUsername, adminPassword, admin, user) {
+    // ===================== LOGOUT AND START SIGNUP =====================
+    await (0, userSignup_1.logoutAndNavigateToSignup)(page, user.UserName);
+    // ===================== COMPLETE SIGNUP PROCESS =====================
+    const signupResult = await (0, userSignup_1.completeUserSignup)(page, user);
+    if (!signupResult.success) {
+        return {
+            email: user.Email,
+            username: user.UserName,
+            status: 'signup-failed',
+            error: signupResult.message
+        };
+    }
+    // ===================== ADMIN LOGIN TO APPROVE USER =====================
+    browser_1.automationEvents.emit('log', `Starting admin login to approve user: ${user.UserName}`);
+    const adminLoginResult = await (0, login_1.login)(page, baseUrl, adminUsername, adminPassword);
+    if (!adminLoginResult.success) {
+        browser_1.automationEvents.emit('error', `Admin login failed for approving user ${user.UserName}: ${adminLoginResult.message}`);
+        return {
+            email: user.Email,
+            username: user.UserName,
+            status: 'signup-complete-but-admin-login-failed',
+            error: adminLoginResult.message
+        };
+    }
+    browser_1.automationEvents.emit('log', `✓ Admin logged in successfully, proceeding to approve user: ${user.UserName}`);
+    await page.waitForLoadState('networkidle');
+    // ===================== USER ACTIVATION PROCESS =====================
+    const activationResult = await (0, userActivation_1.activateUser)(page, admin, user.UserName);
+    if (!activationResult.success) {
+        return {
+            email: user.Email,
+            username: user.UserName,
+            status: 'activation-failed',
+            error: activationResult.message
+        };
+    }
+    // ===================== VERIFY NEW USER LOGIN =====================
+    const verificationResult = await (0, userVerification_1.verifyUserLogin)(page, baseUrl, user.UserName, user.Password);
+    if (verificationResult.loginVerified) {
+        // User successfully logged in, now logout
+        await (0, userVerification_1.logoutAfterVerification)(page);
+        return {
+            email: user.Email,
+            username: user.UserName,
+            status: 'created-activated-and-verified',
+            loginVerified: true
+        };
+    }
+    else {
+        // Login failed - user is already on login page, no need to logout
+        browser_1.automationEvents.emit('log', `User ${user.UserName} login verification failed, user is already logged out`);
+        return {
+            email: user.Email,
+            username: user.UserName,
+            status: 'activated-but-login-failed',
+            loginVerified: false,
+            loginError: verificationResult.message
+        };
+    }
 }

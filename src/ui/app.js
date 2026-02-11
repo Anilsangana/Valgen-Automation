@@ -31,8 +31,7 @@ document.addEventListener("DOMContentLoaded", () => {
       <strong>${action}</strong><br/>
       <span>${time}</span><br/>
       Status:
-      <span style="color:${
-        status === "Completed" ? "lightgreen" :
+      <span style="color:${status === "Completed" ? "lightgreen" :
         status === "Failed" ? "red" : "orange"
       }">${status}</span>
     `;
@@ -104,28 +103,76 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (val === "users") {
       featureBox.innerHTML = `
-        <h3>Create Users</h3>
-        <label>Email
-          <input id="email" placeholder="Enter user email">
-        </label>
+        <h3 class="slide-in" style="animation-delay: 0ms">Create User</h3>
+
+        <div class="input-group slide-in" style="animation-delay: 50ms">
+          <label>Email <span style="color:var(--danger)">*</span></label>
+          <input id="userEmail" placeholder="user@example.com" type="email">
+        </div>
+
+        <div class="input-group slide-in" style="animation-delay: 100ms">
+          <label>Role <span style="color:var(--danger)">*</span></label>
+          <input id="userRole" placeholder="e.g. QA Reviewer">
+        </div>
+
+        <div class="input-group slide-in" style="animation-delay: 150ms">
+          <label>Department <span style="color:var(--danger)">*</span></label>
+          <input id="userDepartment" placeholder="e.g. Quality">
+        </div>
       `;
     }
 
-    if (val === "assign") {
+    if (val === "unified") {
       featureBox.innerHTML = `
-        <h3>Assign Roles</h3>
-        <label>CSV File
-          <input id="csvPath" value="data/assignments.csv">
-        </label>
+        <h3 class="slide-in" style="animation-delay: 0ms">⚡ Complete Setup Flow</h3>
+        <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px;">
+          Full lifecycle test: Create Role, Department, User, activate, verify login, and then deactivate.
+        </p>
+
+        <div class="input-group slide-in" style="animation-delay: 50ms">
+          <label>Role Name <span style="color:var(--danger)">*</span></label>
+          <input id="unifiedRoleName" placeholder="e.g. QA Reviewer">
+        </div>
+
+        <div class="input-group slide-in" style="animation-delay: 100ms">
+          <label>Department Name <span style="color:var(--danger)">*</span></label>
+          <input id="unifiedDeptName" placeholder="e.g. Quality Assurance">
+        </div>
+
+        <div class="input-group slide-in" style="animation-delay: 150ms">
+          <label>User Email <span style="color:var(--danger)">*</span></label>
+          <input id="unifiedUserEmail" placeholder="user@example.com" type="email">
+        </div>
+      `;
+    }
+
+    if (val === "deactivateUsers") {
+      featureBox.innerHTML = `
+        <h3 class="slide-in" style="animation-delay: 0ms">🚫 Deactivate User</h3>
+        <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px;">
+          Deactivate a user account in the system.
+        </p>
+
+        <div class="input-group slide-in" style="animation-delay: 50ms">
+          <label>Username <span style="color:var(--danger)">*</span></label>
+          <input id="deactivateUsername" placeholder="Enter username to deactivate">
+        </div>
       `;
     }
 
     if (val === "departments") {
       featureBox.innerHTML = `
-        <h3>Create Departments</h3>
-        <label>CSV File
-          <input id="csvPath" value="data/departments.csv">
-        </label>
+        <h3 class="slide-in" style="animation-delay: 0ms">🏢 Create Department</h3>
+
+        <div class="input-group slide-in" style="animation-delay: 50ms">
+          <label>Department Name <span style="color:var(--danger)">*</span></label>
+          <input id="deptName" placeholder="e.g. Quality Assurance">
+        </div>
+
+        <div class="input-group slide-in" style="animation-delay: 100ms">
+          <label>Description</label>
+          <input id="deptDescription" placeholder="Optional department description">
+        </div>
       `;
     }
   });
@@ -143,6 +190,19 @@ document.addEventListener("DOMContentLoaded", () => {
     } catch (e) {
       appendLog("Request Failed: " + e.message, "error");
       return { success: false };
+    }
+  }
+
+  /* ---------------- SPINNER CONTROL ---------------- */
+
+  function showSpinner(show) {
+    const spinner = runBtn.querySelector('.spinner');
+    if (spinner) {
+      if (show) {
+        spinner.classList.add('active');
+      } else {
+        spinner.classList.remove('active');
+      }
     }
   }
 
@@ -193,17 +253,7 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
     } else if (feature === "users") {
-      inputField = document.getElementById("email")?.value.trim();
-      if (!inputField) {
-        alert("Email is required.");
-        document.getElementById("email").focus();
-        return;
-      }
-      if (!inputField.includes('@')) {
-        alert("Please enter a valid email address.");
-        document.getElementById("email").focus();
-        return;
-      }
+      // Logic handled inside specific block below to avoid generic 'inputField' confusion
     }
 
     const dupStrategy = document.getElementById("dupStrategy")?.value;
@@ -220,9 +270,126 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (feature === "users") {
       endpoint = "/run/createUsers";
-      body.email = inputField;
-      addAudit("Create Users", "Running");
+
+      const email = document.getElementById("userEmail")?.value.trim();
+      const role = document.getElementById("userRole")?.value.trim();
+      const department = document.getElementById("userDepartment")?.value.trim();
+
+      if (!email) {
+        alert("Email is required for user creation.");
+        document.getElementById("userEmail").focus();
+        return;
+      }
+      if (!email.includes('@')) {
+        alert("Please enter a valid email address.");
+        document.getElementById("userEmail").focus();
+        return;
+      }
+
+      // Make Role and Department required
+      if (!role) {
+        alert("Role is required for user creation.");
+        document.getElementById("userRole").focus();
+        return;
+      }
+
+      if (!department) {
+        alert("Department is required for user creation.");
+        document.getElementById("userDepartment").focus();
+        return;
+      }
+
+      body.users = [{
+        Email: email,
+        FirstName: email.split("@")[0],
+        LastName: "Auto",
+        UserName: email.split("@")[0],
+        Password: "Welcome@123",
+        Role: role,
+        Department: department,
+        Comments: "Auto-generated user"
+      }];
+
+      addAudit("Create User", "Running");
     }
+
+    if (feature === "unified") {
+      endpoint = "/run/unified";
+
+      const roleName = document.getElementById("unifiedRoleName")?.value.trim();
+      const departmentName = document.getElementById("unifiedDeptName")?.value.trim();
+      const userEmail = document.getElementById("unifiedUserEmail")?.value.trim();
+
+      if (!roleName) {
+        alert("Role name is required for unified flow.");
+        document.getElementById("unifiedRoleName").focus();
+        return;
+      }
+
+      if (!departmentName) {
+        alert("Department name is required for unified flow.");
+        document.getElementById("unifiedDeptName").focus();
+        return;
+      }
+
+      if (!userEmail) {
+        alert("User email is required for unified flow.");
+        document.getElementById("unifiedUserEmail").focus();
+        return;
+      }
+
+      if (!userEmail.includes('@')) {
+        alert("Please enter a valid email address.");
+        document.getElementById("unifiedUserEmail").focus();
+        return;
+      }
+
+      body.roleName = roleName;
+      body.departmentName = departmentName;
+      body.userEmail = userEmail;
+
+      addAudit("Complete Setup (Role → Dept → User → Deactivate)", "Running");
+    }
+
+    if (feature === "deactivateUsers") {
+      endpoint = "/run/deactivateUsers";
+
+      const username = document.getElementById("deactivateUsername")?.value.trim();
+
+      if (!username) {
+        alert("Username is required for user deactivation.");
+        document.getElementById("deactivateUsername").focus();
+        return;
+      }
+
+      body.usernames = [username];
+
+      addAudit("Deactivate User", "Running");
+    }
+
+    if (feature === "departments") {
+      endpoint = "/run/createDepartments";
+
+      const deptName = document.getElementById("deptName")?.value.trim();
+      const deptDescription = document.getElementById("deptDescription")?.value.trim();
+
+      if (!deptName) {
+        alert("Department name is required.");
+        document.getElementById("deptName").focus();
+        return;
+      }
+
+      body.departments = [{
+        name: deptName,
+        description: deptDescription || `${deptName} department`
+      }];
+
+      addAudit("Create Department", "Running");
+    }
+
+    // Show spinner at start
+    showSpinner(true);
+    runBtn.disabled = true;
 
     appendLog(`➡️ Executing ${feature}...`);
 
@@ -233,6 +400,11 @@ document.addEventListener("DOMContentLoaded", () => {
     if (result?.success && result.result?.length) {
       displayResults(result.result, feature);
     }
+
+    // Hide spinner at end
+    showSpinner(false);
+    runBtn.disabled = false;
+
   });
 
 });
