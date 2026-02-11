@@ -45,6 +45,30 @@ function getCurrentTimestamp() {
     }) + ' IST';
 }
 /**
+ * Add page footer with page number
+ */
+function addPageFooter(doc, fileName) {
+    const pageHeight = doc.page.height;
+    const pageWidth = doc.page.width;
+    // Footer line
+    doc.moveTo(50, pageHeight - 80)
+        .lineTo(pageWidth - 50, pageHeight - 80)
+        .strokeColor('#cbd5e0')
+        .lineWidth(0.5)
+        .stroke();
+    doc.fontSize(8)
+        .fillColor('#a0aec0')
+        .text('This is an automatically generated audit report for GCP compliance and regulatory record-keeping.', 50, pageHeight - 70, { align: 'center', width: pageWidth - 100 });
+    doc.fontSize(7)
+        .fillColor('#a0aec0')
+        .text(`Report ID: ${fileName}`, 50, pageHeight - 55, { align: 'center', width: pageWidth - 100 });
+    // Page number
+    const pages = doc.bufferedPageRange();
+    doc.fontSize(8)
+        .fillColor('#718096')
+        .text(`Page ${pages.start + pages.count}`, 50, pageHeight - 35, { align: 'center', width: pageWidth - 100 });
+}
+/**
  * Generate PDF audit trail report for GCP compliance
  */
 async function generateAuditPDF(data) {
@@ -62,89 +86,86 @@ async function generateAuditPDF(data) {
             // Create PDF document
             const doc = new pdfkit_1.default({
                 size: 'A4',
-                margins: { top: 50, bottom: 50, left: 50, right: 50 }
+                margins: { top: 60, bottom: 100, left: 50, right: 50 },
+                bufferPages: true
             });
             // Pipe to file
             const stream = fs_1.default.createWriteStream(filePath);
             doc.pipe(stream);
-            // ================== HEADER ==================
-            doc.fontSize(24)
+            // ================== HEADER WITH BRAND BOX ==================
+            // Brand header box
+            doc.rect(50, 50, 495, 70)
+                .fillAndStroke('#0052A5', '#003D7A');
+            doc.fontSize(22)
                 .font('Helvetica-Bold')
-                .fillColor('#1a365d')
-                .text('Clinical Trial Management System', { align: 'center' });
-            doc.fontSize(16)
-                .fillColor('#2d3748')
-                .text('Audit Trail Report', { align: 'center' });
-            doc.moveDown(0.5);
-            doc.fontSize(10)
-                .fillColor('#718096')
-                .text(`Generated: ${getCurrentTimestamp()}`, { align: 'center' });
-            doc.moveDown(1);
-            // Horizontal line
-            doc.moveTo(50, doc.y)
-                .lineTo(545, doc.y)
-                .strokeColor('#cbd5e0')
-                .stroke();
-            doc.moveDown(1);
-            // ================== OPERATION DETAILS ==================
+                .fillColor('#FFFFFF')
+                .text('Digital Lifecycle Workflow Accelerator', 60, 65, { width: 475 });
             doc.fontSize(14)
-                .font('Helvetica-Bold')
-                .fillColor('#1a365d')
-                .text('Operation Details');
-            doc.moveDown(0.5);
-            const detailsY = doc.y;
-            doc.fontSize(10)
-                .font('Helvetica-Bold')
-                .fillColor('#2d3748')
-                .text('Operation Type:', 60, detailsY);
-            doc.font('Helvetica')
-                .fillColor('#4a5568')
-                .text(data.operation, 180, detailsY);
-            doc.font('Helvetica-Bold')
-                .fillColor('#2d3748')
-                .text('Executed By:', 60, detailsY + 20);
-            doc.font('Helvetica')
-                .fillColor('#4a5568')
-                .text(data.adminUser, 180, detailsY + 20);
-            doc.font('Helvetica-Bold')
-                .fillColor('#2d3748')
-                .text('Environment:', 60, detailsY + 40);
-            doc.font('Helvetica')
-                .fillColor('#4a5568')
-                .text(data.baseUrl, 180, detailsY + 40, { width: 350 });
-            doc.font('Helvetica-Bold')
-                .fillColor('#2d3748')
-                .text('Start Time:', 60, detailsY + 60);
-            doc.font('Helvetica')
-                .fillColor('#4a5568')
-                .text(formatTimestamp(data.timestamp), 180, detailsY + 60);
-            doc.y = detailsY + 90;
+                .font('Helvetica')
+                .fillColor('#E0E7FF')
+                .text('Audit Trail Report', 60, 95);
+            doc.moveDown(3);
+            // Generated timestamp in gray box
+            doc.rect(50, 135, 495, 25)
+                .fillAndStroke('#F7FAFC', '#E2E8F0');
+            doc.fontSize(9)
+                .font('Helvetica')
+                .fillColor('#4A5568')
+                .text(`Generated: ${getCurrentTimestamp()}`, 60, 143, { align: 'left' });
+            doc.y = 175;
             doc.moveDown(1);
-            // ================== RESULTS SECTION ==================
-            doc.fontSize(14)
+            // ================== OPERATION DETAILS BOX ==================
+            const detailsBoxY = doc.y;
+            // Section header
+            doc.rect(50, detailsBoxY, 495, 30)
+                .fillAndStroke('#F7FAFC', '#CBD5E0');
+            doc.fontSize(13)
                 .font('Helvetica-Bold')
-                .fillColor('#1a365d')
-                .text('Execution Results');
+                .fillColor('#1A365D')
+                .text('OPERATION DETAILS', 60, detailsBoxY + 10);
+            // Content box
+            const contentY = detailsBoxY + 35;
+            doc.rect(50, contentY, 495, 100)
+                .stroke('#E2E8F0');
+            // Details content
+            let yPos = contentY + 15;
+            addDetailRow(doc, 'Operation Type', data.operation, 70, yPos);
+            yPos += 20;
+            addDetailRow(doc, 'Executed By', data.adminUser, 70, yPos);
+            yPos += 20;
+            addDetailRow(doc, 'Environment', data.baseUrl, 70, yPos, 320);
+            yPos += 20;
+            addDetailRow(doc, 'Start Time', formatTimestamp(data.timestamp), 70, yPos);
+            doc.y = contentY + 110;
+            doc.moveDown(1.5);
+            // ================== EXECUTION RESULTS ==================
+            const resultsHeaderY = doc.y;
+            doc.rect(50, resultsHeaderY, 495, 30)
+                .fillAndStroke('#F7FAFC', '#CBD5E0');
+            doc.fontSize(13)
+                .font('Helvetica-Bold')
+                .fillColor('#1A365D')
+                .text('EXECUTION RESULTS', 60, resultsHeaderY + 10);
+            doc.y = resultsHeaderY + 40;
             doc.moveDown(0.5);
             // Role Creation Results
             if (data.results.role && data.results.role.length > 0) {
-                addResultSection(doc, 'Role Creation', data.results.role, (item) => {
+                addEnterpriseResultSection(doc, 'ROLE CREATION', data.results.role, (item) => {
                     const fields = [
                         { label: 'Role Name', value: item.role || item.roleName || 'N/A' },
                         { label: 'Status', value: item.status || 'N/A' },
                         { label: 'Created As', value: item.createdAs || item.role || 'N/A' },
                         { label: 'Permissions', value: item.permissionsConfigured ? 'Configured' : 'Default' }
                     ];
-                    // Add timestamp if available
                     if (item.timestamp) {
                         fields.push({ label: 'Timestamp', value: formatTimestamp(item.timestamp) });
                     }
                     return fields;
-                });
+                }, fileName);
             }
             // Department Creation Results
             if (data.results.department && data.results.department.length > 0) {
-                addResultSection(doc, 'Department Creation', data.results.department, (item) => {
+                addEnterpriseResultSection(doc, 'DEPARTMENT CREATION', data.results.department, (item) => {
                     const fields = [
                         { label: 'Department', value: item.department || item.name || 'N/A' },
                         { label: 'Status', value: item.status || 'N/A' },
@@ -155,11 +176,11 @@ async function generateAuditPDF(data) {
                         fields.push({ label: 'Timestamp', value: formatTimestamp(item.timestamp) });
                     }
                     return fields;
-                });
+                }, fileName);
             }
             // User Creation Results
             if (data.results.user && data.results.user.length > 0) {
-                addResultSection(doc, 'User Creation', data.results.user, (item) => {
+                addEnterpriseResultSection(doc, 'USER CREATION', data.results.user, (item) => {
                     const fields = [
                         { label: 'Email', value: item.email || 'N/A' },
                         { label: 'Username', value: item.username || 'N/A' },
@@ -176,11 +197,11 @@ async function generateAuditPDF(data) {
                         fields.push({ label: 'Timestamp', value: formatTimestamp(item.timestamp) });
                     }
                     return fields;
-                });
+                }, fileName);
             }
             // User Deactivation Results
             if (data.results.deactivation && data.results.deactivation.length > 0) {
-                addResultSection(doc, 'User Deactivation', data.results.deactivation, (item) => {
+                addEnterpriseResultSection(doc, 'USER DEACTIVATION', data.results.deactivation, (item) => {
                     const fields = [
                         { label: 'Username', value: item.username || 'N/A' },
                         { label: 'Status', value: item.status || 'N/A' },
@@ -190,14 +211,8 @@ async function generateAuditPDF(data) {
                         fields.push({ label: 'Timestamp', value: formatTimestamp(item.timestamp) });
                     }
                     return fields;
-                });
+                }, fileName);
             }
-            // ================== FOOTER ==================
-            const pageHeight = doc.page.height;
-            doc.fontSize(8)
-                .fillColor('#a0aec0')
-                .text('This is an automatically generated audit report for GCP compliance and record-keeping purposes.', 50, pageHeight - 70, { align: 'center', width: 495 });
-            doc.text(`Report ID: ${fileName}`, 50, pageHeight - 50, { align: 'center', width: 495 });
             // Finalize PDF
             doc.end();
             stream.on('finish', () => {
@@ -213,46 +228,69 @@ async function generateAuditPDF(data) {
     });
 }
 /**
- * Helper function to add result section to PDF
+ * Add detail row helper
  */
-function addResultSection(doc, title, items, fieldMapper) {
-    doc.fontSize(12)
+function addDetailRow(doc, label, value, x, y, valueWidth = 350) {
+    doc.fontSize(9)
         .font('Helvetica-Bold')
-        .fillColor('#2d3748')
-        .text(title);
-    doc.moveDown(0.3);
+        .fillColor('#2D3748')
+        .text(`${label}:`, x, y);
+    doc.font('Helvetica')
+        .fillColor('#4A5568')
+        .text(value, x + 120, y, { width: valueWidth });
+}
+/**
+ * Enterprise-style result section with professional boxes
+ */
+function addEnterpriseResultSection(doc, title, items, fieldMapper, fileName) {
+    // Check if we need a new page for section header
+    if (doc.y > 650) {
+        doc.addPage();
+        addPageFooter(doc, fileName);
+    }
+    // Section header bar
+    const sectionHeaderY = doc.y;
+    doc.rect(50, sectionHeaderY, 495, 28)
+        .fillAndStroke('#EDF2F7', '#CBD5E0');
+    doc.fontSize(11)
+        .font('Helvetica-Bold')
+        .fillColor('#1A365D')
+        .text(title, 60, sectionHeaderY + 9);
+    doc.y = sectionHeaderY + 35;
     items.forEach((item, index) => {
-        // Item box background
-        const startY = doc.y;
-        // Extract clean title (remove emojis)
-        const cleanTitle = title.replace(/[\u{1F300}-\u{1F9FF}]/gu, '').trim();
+        const fields = fieldMapper(item);
+        const itemHeight = (fields.length * 20) + 35; // Calculate needed height
+        // Check if we need a new page
+        if (doc.y + itemHeight > 700) {
+            doc.addPage();
+            addPageFooter(doc, fileName);
+            doc.y = 60;
+        }
+        const itemStartY = doc.y;
+        // Item header
+        doc.rect(50, itemStartY, 495, 25)
+            .fillAndStroke('#F7FAFC', '#CBD5E0');
         doc.fontSize(10)
             .font('Helvetica-Bold')
-            .fillColor('#1a365d')
-            .text(`${cleanTitle} #${index + 1}`, 70, startY);
-        let currentY = startY + 20;
-        const fields = fieldMapper(item);
+            .fillColor('#2C5282')
+            .text(`${title.split(' ')[0]} #${index + 1}`, 60, itemStartY + 7);
+        // Item content box
+        const contentStartY = itemStartY + 25;
+        doc.rect(50, contentStartY, 495, itemHeight - 25)
+            .stroke('#E2E8F0');
+        let fieldY = contentStartY + 12;
         fields.forEach((field) => {
-            // Check if we need a new page
-            if (currentY > 700) {
-                doc.addPage();
-                currentY = 50;
-            }
-            doc.fontSize(9)
+            doc.fontSize(8)
                 .font('Helvetica-Bold')
-                .fillColor('#4a5568')
-                .text(`${field.label}:`, 70, currentY);
-            doc.font('Helvetica')
-                .fillColor('#718096')
-                .text(field.value, 180, currentY, { width: 350 });
-            currentY += 18;
+                .fillColor('#4A5568')
+                .text(`${field.label}:`, 65, fieldY);
+            doc.fontSize(8)
+                .font('Helvetica')
+                .fillColor('#2D3748')
+                .text(field.value, 185, fieldY, { width: 345 });
+            fieldY += 20;
         });
-        // Draw border around item
-        doc.rect(60, startY - 5, 485, currentY - startY + 5)
-            .strokeColor('#e2e8f0')
-            .stroke();
-        doc.y = currentY + 10;
-        doc.moveDown(0.5);
+        doc.y = itemStartY + itemHeight + 10;
     });
     doc.moveDown(1);
 }
