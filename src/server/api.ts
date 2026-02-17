@@ -104,23 +104,33 @@ app.post('/run/createUsers', async (req, res) => {
 
 
   try {
-
     automationEvents.emit('log', 'Processing user creation request...');
-
     const result = await runCreateUsers(baseUrl, username, password, users);
+    const hasSuccess = result.some((r: any) => r.status === 'created' || r.status === 'created-appended' || r.status === 'created-activated-and-verified');
 
-    const hasSuccess = result.some((r: any) => r.status === 'created' || r.status === 'created-appended');
+    // Generate PDF audit trail
+    const timestamp = new Date().toISOString();
+    const pdfPath = await generateAuditPDF({
+      operation: 'User Creation',
+      timestamp,
+      adminUser: username,
+      baseUrl,
+      results: { user: result }
+    });
 
-    res.json({ success: hasSuccess, result });
+    const fileName = pdfPath.split(/[/\\]/).pop() || 'audit-report.pdf';
+    automationEvents.emit('log', `✓ PDF audit report generated: ${fileName}`);
 
+    res.json({
+      success: hasSuccess,
+      result,
+      pdfFileName: fileName,
+      pdfDownloadUrl: `/download-audit/${fileName}`
+    });
   } catch (err) {
-
     automationEvents.emit('error', `User creation failed: ${String(err)}`);
-
     res.status(500).json({ success: false, message: String(err) });
-
   }
-
 });
 
 
@@ -151,16 +161,29 @@ app.post('/run/createRoles', async (req, res) => {
 
     const result = await runCreateRoles(baseUrl, username, password, roleName, duplicateStrategy);
 
-    res.json({ success: true, result });
+    // Generate PDF audit trail
+    const timestamp = new Date().toISOString();
+    const pdfPath = await generateAuditPDF({
+      operation: 'Role Creation',
+      timestamp,
+      adminUser: username,
+      baseUrl,
+      results: { role: result }
+    });
 
+    const fileName = pdfPath.split(/[/\\]/).pop() || 'audit-report.pdf';
+    automationEvents.emit('log', `✓ PDF audit report generated: ${fileName}`);
+
+    res.json({
+      success: true,
+      result,
+      pdfFileName: fileName,
+      pdfDownloadUrl: `/download-audit/${fileName}`
+    });
   } catch (err) {
-
     automationEvents.emit('error', `Role creation failed: ${String(err)}`);
-
     res.status(500).json({ success: false, message: String(err) });
-
   }
-
 });
 
 
@@ -250,7 +273,26 @@ app.post('/run/createDepartments', async (req, res) => {
     const result = await runCreateDepartments(baseUrl, username, password, departments);
 
     const hasSuccess = result.some((r: any) => r.status === 'created' || r.status === 'created-appended');
-    res.json({ success: hasSuccess, result });
+
+    // Generate PDF audit trail
+    const timestamp = new Date().toISOString();
+    const pdfPath = await generateAuditPDF({
+      operation: 'Department Creation',
+      timestamp,
+      adminUser: username,
+      baseUrl,
+      results: { department: result }
+    });
+
+    const fileName = pdfPath.split(/[/\\]/).pop() || 'audit-report.pdf';
+    automationEvents.emit('log', `✓ PDF audit report generated: ${fileName}`);
+
+    res.json({
+      success: hasSuccess,
+      result,
+      pdfFileName: fileName,
+      pdfDownloadUrl: `/download-audit/${fileName}`
+    });
   } catch (err) {
     automationEvents.emit('error', `Department creation failed: ${String(err)}`);
     res.status(500).json({ success: false, message: String(err) });

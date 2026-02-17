@@ -44,13 +44,14 @@ async function deactivateUser(page, admin, username) {
         browser_1.automationEvents.emit('log', `Step 6: Selecting 'Deactivate' option`);
         await deactivationFrame.locator('[for="rbtnDeactivate"]').click();
         // await page.waitForLoadState('networkidle');
-        await page.waitForTimeout(1000);
+        await page.waitForTimeout(1500);
         await page.waitForLoadState('load');
         await page.waitForLoadState('domcontentloaded');
         browser_1.automationEvents.emit('log', `✓ Deactivate option selected`);
         // Step 7: Fill deactivation comments
         browser_1.automationEvents.emit('log', `Step 7: Adding deactivation comments`);
         await deactivationFrame.locator('#txtComments').pressSequentially(`${username} is deactivated by automation`);
+        await page.waitForTimeout(500);
         await page.waitForLoadState('load');
         await page.waitForLoadState('domcontentloaded');
         browser_1.automationEvents.emit('log', `✓ Comments added: '${username} is deactivated by automation'`);

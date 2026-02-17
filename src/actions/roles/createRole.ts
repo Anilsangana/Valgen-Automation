@@ -160,13 +160,12 @@ export async function createRole(
 
         .fill(`Auto created role - ${r.roleName}`);
 
-      await page.waitForTimeout(1000);
+      await page.waitForTimeout(500);
+      await page.mouse.move(200, 200);
 
-      await page.mouse.move(1, 1);
 
       await frame.locator('#btnSubmit').click();
 
-      await page.mouse.move(1, 1);
       await page.waitForLoadState('load');
 
 

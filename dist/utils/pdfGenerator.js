@@ -15,7 +15,7 @@ function formatTimestamp(isoString) {
     try {
         const date = new Date(isoString);
         return date.toLocaleString('en-US', {
-            timeZone: 'Asia/Kolkata',
+            timeZone: 'UTC',
             year: 'numeric',
             month: '2-digit',
             day: '2-digit',
@@ -23,18 +23,18 @@ function formatTimestamp(isoString) {
             minute: '2-digit',
             second: '2-digit',
             hour12: false
-        }) + ' IST';
+        }) + ' UTC';
     }
     catch {
         return isoString;
     }
 }
 /**
- * Get current timestamp in IST
+ * Get current timestamp in UTC
  */
 function getCurrentTimestamp() {
     return new Date().toLocaleString('en-US', {
-        timeZone: 'Asia/Kolkata',
+        timeZone: 'UTC',
         year: 'numeric',
         month: '2-digit',
         day: '2-digit',
@@ -42,31 +42,7 @@ function getCurrentTimestamp() {
         minute: '2-digit',
         second: '2-digit',
         hour12: false
-    }) + ' IST';
-}
-/**
- * Add page footer with page number
- */
-function addPageFooter(doc, fileName) {
-    const pageHeight = doc.page.height;
-    const pageWidth = doc.page.width;
-    // Footer line
-    doc.moveTo(50, pageHeight - 80)
-        .lineTo(pageWidth - 50, pageHeight - 80)
-        .strokeColor('#cbd5e0')
-        .lineWidth(0.5)
-        .stroke();
-    doc.fontSize(8)
-        .fillColor('#a0aec0')
-        .text('This is an automatically generated audit report for GCP compliance and regulatory record-keeping.', 50, pageHeight - 70, { align: 'center', width: pageWidth - 100 });
-    doc.fontSize(7)
-        .fillColor('#a0aec0')
-        .text(`Report ID: ${fileName}`, 50, pageHeight - 55, { align: 'center', width: pageWidth - 100 });
-    // Page number
-    const pages = doc.bufferedPageRange();
-    doc.fontSize(8)
-        .fillColor('#718096')
-        .text(`Page ${pages.start + pages.count}`, 50, pageHeight - 35, { align: 'center', width: pageWidth - 100 });
+    }) + ' UTC';
 }
 /**
  * Generate PDF audit trail report for GCP compliance
@@ -83,11 +59,12 @@ async function generateAuditPDF(data) {
     const filePath = path_1.default.join(reportsDir, fileName);
     return new Promise((resolve, reject) => {
         try {
-            // Create PDF document
+            // Create PDF document with buffering to add footers later
             const doc = new pdfkit_1.default({
                 size: 'A4',
-                margins: { top: 60, bottom: 100, left: 50, right: 50 },
-                bufferPages: true
+                margins: { top: 60, bottom: 80, left: 50, right: 50 },
+                bufferPages: true,
+                autoFirstPage: true
             });
             // Pipe to file
             const stream = fs_1.default.createWriteStream(filePath);
@@ -99,11 +76,11 @@ async function generateAuditPDF(data) {
             doc.fontSize(22)
                 .font('Helvetica-Bold')
                 .fillColor('#FFFFFF')
-                .text('Digital Lifecycle Workflow Accelerator', 60, 65, { width: 475 });
+                .text('SmartIMS', 60, 65, { width: 475 });
             doc.fontSize(14)
                 .font('Helvetica')
                 .fillColor('#E0E7FF')
-                .text('Audit Trail Report', 60, 95);
+                .text('Assuring Outcomes - Audit Trail Report', 60, 95);
             doc.moveDown(3);
             // Generated timestamp in gray box
             doc.rect(50, 135, 495, 25)
@@ -161,7 +138,7 @@ async function generateAuditPDF(data) {
                         fields.push({ label: 'Timestamp', value: formatTimestamp(item.timestamp) });
                     }
                     return fields;
-                }, fileName);
+                });
             }
             // Department Creation Results
             if (data.results.department && data.results.department.length > 0) {
@@ -176,7 +153,7 @@ async function generateAuditPDF(data) {
                         fields.push({ label: 'Timestamp', value: formatTimestamp(item.timestamp) });
                     }
                     return fields;
-                }, fileName);
+                });
             }
             // User Creation Results
             if (data.results.user && data.results.user.length > 0) {
@@ -197,7 +174,7 @@ async function generateAuditPDF(data) {
                         fields.push({ label: 'Timestamp', value: formatTimestamp(item.timestamp) });
                     }
                     return fields;
-                }, fileName);
+                });
             }
             // User Deactivation Results
             if (data.results.deactivation && data.results.deactivation.length > 0) {
@@ -211,7 +188,26 @@ async function generateAuditPDF(data) {
                         fields.push({ label: 'Timestamp', value: formatTimestamp(item.timestamp) });
                     }
                     return fields;
-                }, fileName);
+                });
+            }
+            // ================== ADD FOOTERS TO ALL PAGES ==================
+            const range = doc.bufferedPageRange();
+            for (let i = 0; i < range.count; i++) {
+                doc.switchToPage(i);
+                const pageHeight = doc.page.height;
+                const pageWidth = doc.page.width;
+                // Footer line
+                doc.moveTo(50, pageHeight - 70)
+                    .lineTo(pageWidth - 50, pageHeight - 70)
+                    .strokeColor('#cbd5e0')
+                    .lineWidth(0.5)
+                    .stroke();
+                doc.fontSize(7)
+                    .fillColor('#a0aec0')
+                    .text('This is an automatically generated audit report for GCP compliance and regulatory record-keeping.', 50, pageHeight - 60, { align: 'center', width: pageWidth - 100 });
+                doc.fontSize(7)
+                    .fillColor('#a0aec0')
+                    .text(`Report ID: ${fileName} | Page ${i + 1} of ${range.count}`, 50, pageHeight - 45, { align: 'center', width: pageWidth - 100 });
             }
             // Finalize PDF
             doc.end();
@@ -240,13 +236,12 @@ function addDetailRow(doc, label, value, x, y, valueWidth = 350) {
         .text(value, x + 120, y, { width: valueWidth });
 }
 /**
- * Enterprise-style result section with professional boxes
+ * Enterprise-style result section with professional boxes (NO footer calls)
  */
-function addEnterpriseResultSection(doc, title, items, fieldMapper, fileName) {
+function addEnterpriseResultSection(doc, title, items, fieldMapper) {
     // Check if we need a new page for section header
-    if (doc.y > 650) {
+    if (doc.y > 700) {
         doc.addPage();
-        addPageFooter(doc, fileName);
     }
     // Section header bar
     const sectionHeaderY = doc.y;
@@ -260,10 +255,9 @@ function addEnterpriseResultSection(doc, title, items, fieldMapper, fileName) {
     items.forEach((item, index) => {
         const fields = fieldMapper(item);
         const itemHeight = (fields.length * 20) + 35; // Calculate needed height
-        // Check if we need a new page
-        if (doc.y + itemHeight > 700) {
+        // Check if we need a new page (with bottom margin for footer)
+        if (doc.y + itemHeight > 720) {
             doc.addPage();
-            addPageFooter(doc, fileName);
             doc.y = 60;
         }
         const itemStartY = doc.y;

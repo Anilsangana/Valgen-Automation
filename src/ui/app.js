@@ -14,7 +14,7 @@ document.addEventListener("DOMContentLoaded", () => {
   /* ---------------- LOGGING ---------------- */
 
   function appendLog(message, type = 'log') {
-    const timestamp = new Date().toLocaleTimeString();
+    const timestamp = new Date().toLocaleTimeString('en-US', { timeZone: 'UTC', hour12: false }) + ' UTC';
     const logEntry = document.createElement('div');
     logEntry.textContent = `[${timestamp}] ${message}`;
     logEntry.classList.add('fade-in');
@@ -26,7 +26,7 @@ document.addEventListener("DOMContentLoaded", () => {
   function addAudit(action, status = "Pending") {
     if (!auditList) return;
     const li = document.createElement("li");
-    const time = new Date().toLocaleString();
+    const time = new Date().toLocaleString('en-US', { timeZone: 'UTC', hour12: false }) + ' UTC';
     li.innerHTML = `
       <strong>${action}</strong><br/>
       <span>${time}</span><br/>
@@ -46,13 +46,30 @@ document.addEventListener("DOMContentLoaded", () => {
     resultsList.innerHTML = '';
 
     results.forEach(item => {
-      if (item.status === 'created' || item.status === 'created-appended') {
+      if (item.status === 'created' || item.status === 'created-appended' || item.status === 'created-activated-and-verified') {
         const div = document.createElement('div');
         div.className = 'result-item';
+
+        // Determine display name based on type
+        let displayName = 'N/A';
+        let displayTitle = 'Item Created';
+
+        if (type === 'roles') {
+          displayName = item.role || item.createdAs || 'N/A';
+          displayTitle = 'Role Created';
+        } else if (type === 'users') {
+          displayName = item.username || item.email || 'N/A';
+          displayTitle = 'User Created';
+        } else if (type === 'departments') {
+          displayName = item.department || item.createdAs || 'N/A';
+          displayTitle = 'Department Created';
+        }
+
         div.innerHTML = `
-          <h4>${type === 'roles' ? 'Role' : 'User'} Created</h4>
-          <p><strong>Name:</strong> ${item.role || item.email}</p>
+          <h4>${displayTitle}</h4>
+          <p><strong>Name:</strong> ${displayName}</p>
           ${item.createdAs ? `<p><strong>Created As:</strong> ${item.createdAs}</p>` : ''}
+          ${item.status ? `<p><strong>Status:</strong> ${item.status}</p>` : ''}
         `;
         resultsList.appendChild(div);
       }
@@ -404,8 +421,11 @@ document.addEventListener("DOMContentLoaded", () => {
       displayResults([result.result], feature);
     }
 
-    // Generate PDF audit trail for successful operations
-    if (result?.success) {
+    // Show PDF download link if backend generated one
+    if (result?.success && result.pdfDownloadUrl) {
+      showPDFDownloadLink(result.pdfFileName, result.pdfDownloadUrl);
+    } else if (result?.success) {
+      // For unified flow that doesn't return pdfDownloadUrl yet, generate PDF on frontend
       await generateAuditPDF(feature, body, result.result);
     }
 
@@ -414,6 +434,22 @@ document.addEventListener("DOMContentLoaded", () => {
     runBtn.disabled = false;
 
   });
+
+  // ===================== PDF DOWNLOAD LINK =====================
+
+  function showPDFDownloadLink(fileName, downloadUrl) {
+    const pdfSection = document.getElementById('pdfSection');
+    const pdfDownload = document.getElementById('pdfDownload');
+
+    pdfDownload.innerHTML = `
+      <a href="${downloadUrl}" download="${fileName}" class="download-btn">
+        📄 Download Audit PDF: ${fileName}
+      </a>
+    `;
+
+    pdfSection.style.display = 'block';
+    appendLog(`✓ PDF audit report ready: ${fileName}`);
+  }
 
   // ===================== PDF GENERATION =====================
 
