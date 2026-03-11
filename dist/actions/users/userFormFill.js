@@ -11,14 +11,14 @@ async function fillUserCreationForm(page, frame, user) {
     browser_1.automationEvents.emit('log', `Filling user creation form for: ${user.Email}`);
     // Select Role if provided
     if (user.Role) {
-        await page.waitForLoadState('domcontentloaded');
+        await (0, navigation_1.waitForIframeLoaderGone)(page, 10000);
         await frame.locator('#ddlRole').selectOption({ label: user.Role });
     }
     else {
         browser_1.automationEvents.emit('log', 'No role specified, skipping role selection.');
     }
-    await page.waitForTimeout(2000);
-    await page.waitForLoadState('domcontentloaded');
+    await (0, navigation_1.waitForOverlayGone)(page, 15000);
+    await (0, navigation_1.waitForIframeLoaderGone)(page, 15000);
     // Select Department if provided
     if (user.Department) {
         try {
@@ -28,8 +28,8 @@ async function fillUserCreationForm(page, frame, user) {
             browser_1.automationEvents.emit('error', `Department '${user.Department}' not found in dropdown, skipping department selection`);
         }
     }
-    await page.waitForTimeout(1000);
-    await page.waitForLoadState('domcontentloaded');
+    await (0, navigation_1.waitForOverlayGone)(page, 15000);
+    await (0, navigation_1.waitForIframeLoaderGone)(page, 15000);
     // Fill First Name
     await frame.locator('#txtFirstName').fill(user.FirstName);
     browser_1.automationEvents.emit('log', `Filled FirstName: ${user.FirstName}`);
@@ -70,7 +70,10 @@ async function fillUserCreationForm(page, frame, user) {
 async function navigateToUserCreateForm(page) {
     await (0, navigation_1.waitForOverlayGone)(page);
     const frame = page.frameLocator('#framecontent');
+    await (0, navigation_1.waitForIframeLoaderGone)(page, 15000);
     await frame.locator('#liCreateUser').click().catch(() => { });
+    await (0, navigation_1.waitForOverlayGone)(page, 15000);
+    await (0, navigation_1.waitForIframeLoaderGone)(page, 15000);
     await frame.locator('#divCreateUser').waitFor({ state: 'visible' });
     return frame;
 }

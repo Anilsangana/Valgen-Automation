@@ -16,8 +16,8 @@ async function createDepartment(page, departments, options = {}) {
             await (0, navigation_1.waitForPostback)(page, 15000);
             await (0, navigation_1.waitForOverlayGone)(page);
             const frame = page.frameLocator('#framecontent');
-            // ===================== FORM FILLING =====================
-            await page.waitForTimeout(1000);
+            // Wait for iframe loader to disappear and form to be ready
+            await (0, navigation_1.waitForIframeLoaderGone)(page, 15000);
             await frame.locator('#txtboxDepartmentName')
                 .waitFor({ state: 'visible', timeout: 8000 });
             await frame.locator('#txtboxDepartmentName')
@@ -34,7 +34,7 @@ async function createDepartment(page, departments, options = {}) {
             await page.waitForTimeout(2000);
             // ===================== SUBMIT =====================
             await frame.locator('#btnSubmit').click();
-            await page.waitForTimeout(2000);
+            await (0, navigation_1.waitForOverlayGone)(page, 15000);
             // ===================== POPUP DETECTION =====================
             const successPopup = frame.locator('#val1_lblCM');
             const duplicatePopup = frame.locator('#val1_lblErrorAlert', { hasText: 'Department Name must be unique' });

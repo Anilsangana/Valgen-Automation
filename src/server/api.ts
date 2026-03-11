@@ -1,14 +1,30 @@
+import 'dotenv/config';
 import express from 'express';
 
 import path from 'path';
 
 import bodyParser from 'body-parser';
 
-import { runCreateRoles, runAll, runCreateUsers, runUnifiedFlow, runDeactivateUsers, runCreateDepartments } from './jobRunner';
-
-import { automationEvents } from '../core/browser';
+import { runCreateRoles, runAll, runCreateUsers, runUnifiedFlow, runDeactivateUsers, runCreateDepartments, runCreateCategories, runCreateGroups, runCreateSubCategories, runCreateFunctionalRoles } from './jobRunner';import { automationEvents } from '../core/browser';
 import { generateAuditPDF, getAuditReports } from '../utils/pdfGenerator';
+import { executeNLPCommand } from '../actions/nlp/nlpAutomation';
+import { getOrCreateEngine, closeEngine } from '../actions/ai/ollamaAutomation';
+import { getOrCreateMcpEngine, closeMcpEngine } from '../actions/ai/ollamaMcpAgent';
+// ── Prevent unhandled promise rejections from crashing the server ──────────────
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('[Server] Unhandled Rejection at:', promise, 'reason:', reason);
+  // Do NOT exit — keep the server running
+});
 
+process.on('uncaughtException', (err) => {
+  console.error('[Server] Uncaught Exception:', err);
+  // Do NOT exit — keep the server running
+});
+
+// ── Prevent EventEmitter 'error' events from crashing the process ──────────
+automationEvents.on('error', (msg) => {
+  console.error('[Automation Event Error]:', msg);
+});
 
 
 const app = express();
@@ -129,7 +145,20 @@ app.post('/run/createUsers', async (req, res) => {
     });
   } catch (err) {
     automationEvents.emit('error', `User creation failed: ${String(err)}`);
-    res.status(500).json({ success: false, message: String(err) });
+    try {
+      const timestamp = new Date().toISOString();
+      const pdfPath = await generateAuditPDF({
+        operation: 'User Creation',
+        timestamp,
+        adminUser: username,
+        baseUrl,
+        results: { user: [{ username: users[0]?.UserName || 'N/A', status: 'error', message: String(err) }] }
+      });
+      const fileName = pdfPath.split(/[/\\]/).pop() || 'audit-report.pdf';
+      res.status(500).json({ success: false, message: String(err), pdfFileName: fileName, pdfDownloadUrl: `/download-audit/${fileName}` });
+    } catch {
+      res.status(500).json({ success: false, message: String(err) });
+    }
   }
 });
 
@@ -182,7 +211,20 @@ app.post('/run/createRoles', async (req, res) => {
     });
   } catch (err) {
     automationEvents.emit('error', `Role creation failed: ${String(err)}`);
-    res.status(500).json({ success: false, message: String(err) });
+    try {
+      const timestamp = new Date().toISOString();
+      const pdfPath = await generateAuditPDF({
+        operation: 'Role Creation',
+        timestamp,
+        adminUser: username,
+        baseUrl,
+        results: { role: [{ role: roleName, status: 'error', message: String(err) }] }
+      });
+      const fileName = pdfPath.split(/[/\\]/).pop() || 'audit-report.pdf';
+      res.status(500).json({ success: false, message: String(err), pdfFileName: fileName, pdfDownloadUrl: `/download-audit/${fileName}` });
+    } catch {
+      res.status(500).json({ success: false, message: String(err) });
+    }
   }
 });
 
@@ -247,10 +289,36 @@ app.post('/run/deactivateUsers', async (req, res) => {
     const result = await runDeactivateUsers(baseUrl, username, password, usernames);
 
     const hasSuccess = result.some((r: any) => r.status === 'deactivated');
-    res.json({ success: hasSuccess, result });
+
+    // Generate PDF audit trail
+    const timestamp = new Date().toISOString();
+    const pdfPath = await generateAuditPDF({
+      operation: 'User Deactivation',
+      timestamp,
+      adminUser: username,
+      baseUrl,
+      results: { deactivation: result }
+    });
+    const fileName = pdfPath.split(/[/\\]/).pop() || 'audit-report.pdf';
+    automationEvents.emit('log', `✓ PDF audit report generated: ${fileName}`);
+
+    res.json({ success: hasSuccess, result, pdfFileName: fileName, pdfDownloadUrl: `/download-audit/${fileName}` });
   } catch (err) {
     automationEvents.emit('error', `User deactivation failed: ${String(err)}`);
-    res.status(500).json({ success: false, message: String(err) });
+    try {
+      const timestamp = new Date().toISOString();
+      const pdfPath = await generateAuditPDF({
+        operation: 'User Deactivation',
+        timestamp,
+        adminUser: username,
+        baseUrl,
+        results: { deactivation: [{ username: usernames[0] || 'N/A', status: 'error', message: String(err) }] }
+      });
+      const fileName = pdfPath.split(/[/\\]/).pop() || 'audit-report.pdf';
+      res.status(500).json({ success: false, message: String(err), pdfFileName: fileName, pdfDownloadUrl: `/download-audit/${fileName}` });
+    } catch {
+      res.status(500).json({ success: false, message: String(err) });
+    }
   }
 });
 
@@ -295,6 +363,299 @@ app.post('/run/createDepartments', async (req, res) => {
     });
   } catch (err) {
     automationEvents.emit('error', `Department creation failed: ${String(err)}`);
+    try {
+      const timestamp = new Date().toISOString();
+      const pdfPath = await generateAuditPDF({
+        operation: 'Department Creation',
+        timestamp,
+        adminUser: username,
+        baseUrl,
+        results: { department: [{ department: departments[0]?.name || 'N/A', status: 'error', message: String(err) }] }
+      });
+      const fileName = pdfPath.split(/[/\\]/).pop() || 'audit-report.pdf';
+      res.status(500).json({ success: false, message: String(err), pdfFileName: fileName, pdfDownloadUrl: `/download-audit/${fileName}` });
+    } catch {
+      res.status(500).json({ success: false, message: String(err) });
+    }
+  }
+});
+
+app.post('/run/createCategories', async (req, res) => {
+  const { baseUrl, username, password, categories, duplicateStrategy } = req.body;
+
+  // Server-side validation
+  if (!baseUrl || !username || !password || !categories) {
+    automationEvents.emit('error', 'Missing required fields for category creation');
+    return res.status(400).json({ success: false, message: 'Missing required fields' });
+  }
+
+  if (!Array.isArray(categories) || categories.length === 0) {
+    automationEvents.emit('error', 'Categories must be a non-empty array');
+    return res.status(400).json({ success: false, message: 'Categories must be a non-empty array' });
+  }
+
+  try {
+    automationEvents.emit('log', 'Processing category creation request...');
+    const result = await runCreateCategories(baseUrl, username, password, categories, duplicateStrategy);
+
+    const hasSuccess = result.some((r: any) => r.status === 'created' || r.status === 'created-appended');
+
+    // Generate PDF audit trail
+    const timestamp = new Date().toISOString();
+    const pdfPath = await generateAuditPDF({
+      operation: 'Category Creation',
+      timestamp,
+      adminUser: username,
+      baseUrl,
+      results: { category: result }
+    });
+
+    const fileName = pdfPath.split(/[/\\]/).pop() || 'audit-report.pdf';
+    automationEvents.emit('log', `✓ PDF audit report generated: ${fileName}`);
+
+    res.json({
+      success: hasSuccess,
+      result,
+      pdfFileName: fileName,
+      pdfDownloadUrl: `/download-audit/${fileName}`
+    });
+  } catch (err) {
+    automationEvents.emit('error', `Category creation failed: ${String(err)}`);
+    try {
+      const timestamp = new Date().toISOString();
+      const pdfPath = await generateAuditPDF({
+        operation: 'Category Creation',
+        timestamp,
+        adminUser: username,
+        baseUrl,
+        results: { category: [{ category: categories[0]?.name || 'N/A', status: 'error', message: String(err) }] }
+      });
+      const fileName = pdfPath.split(/[/\\]/).pop() || 'audit-report.pdf';
+      res.status(500).json({ success: false, message: String(err), pdfFileName: fileName, pdfDownloadUrl: `/download-audit/${fileName}` });
+    } catch {
+      res.status(500).json({ success: false, message: String(err) });
+    }
+  }
+});
+
+// ===================== NATURAL LANGUAGE AUTOMATION ENDPOINT =====================
+
+app.post('/run/createGroups', async (req, res) => {
+  const { baseUrl, username, password, groups, duplicateStrategy } = req.body;
+
+  if (!baseUrl || !username || !password || !groups) {
+    automationEvents.emit('error', 'Missing required fields for group creation');
+    return res.status(400).json({ success: false, message: 'Missing required fields' });
+  }
+
+  if (!Array.isArray(groups) || groups.length === 0) {
+    automationEvents.emit('error', 'Groups must be a non-empty array');
+    return res.status(400).json({ success: false, message: 'Groups must be a non-empty array' });
+  }
+
+  try {
+    automationEvents.emit('log', 'Processing group creation request...');
+    const result = await runCreateGroups(baseUrl, username, password, groups, duplicateStrategy);
+
+    const hasSuccess = result.some((r: any) => r.status === 'created' || r.status === 'created-appended');
+
+    // Generate PDF audit trail
+    const timestamp = new Date().toISOString();
+    const pdfPath = await generateAuditPDF({
+      operation: 'Group Creation',
+      timestamp,
+      adminUser: username,
+      baseUrl,
+      results: { group: result }
+    });
+
+    const fileName = pdfPath.split(/[/\\]/).pop() || 'audit-report.pdf';
+    automationEvents.emit('log', `✓ PDF audit report generated: ${fileName}`);
+
+    res.json({
+      success: hasSuccess,
+      result,
+      pdfFileName: fileName,
+      pdfDownloadUrl: `/download-audit/${fileName}`
+    });
+  } catch (err) {
+    automationEvents.emit('error', `Group creation failed: ${String(err)}`);
+    try {
+      const timestamp = new Date().toISOString();
+      const pdfPath = await generateAuditPDF({
+        operation: 'Group Creation',
+        timestamp,
+        adminUser: username,
+        baseUrl,
+        results: { group: [{ group: groups[0]?.name || 'N/A', status: 'error', message: String(err) }] }
+      });
+      const fileName = pdfPath.split(/[/\\]/).pop() || 'audit-report.pdf';
+      res.status(500).json({ success: false, message: String(err), pdfFileName: fileName, pdfDownloadUrl: `/download-audit/${fileName}` });
+    } catch {
+      res.status(500).json({ success: false, message: String(err) });
+    }
+  }
+});
+
+// ===================== CREATE SUB CATEGORIES =====================
+app.post('/run/createSubCategories', async (req, res) => {
+  const { baseUrl, username, password, subCategories, duplicateStrategy } = req.body;
+
+  if (!baseUrl || !username || !password || !subCategories) {
+    automationEvents.emit('error', 'Missing required fields for sub category creation');
+    return res.status(400).json({ success: false, message: 'Missing required fields' });
+  }
+
+  if (!Array.isArray(subCategories) || subCategories.length === 0) {
+    automationEvents.emit('error', 'Sub Categories must be a non-empty array');
+    return res.status(400).json({ success: false, message: 'Sub Categories must be a non-empty array' });
+  }
+
+  try {
+    automationEvents.emit('log', 'Processing sub category creation request...');
+    const result = await runCreateSubCategories(baseUrl, username, password, subCategories, duplicateStrategy);
+
+    const hasSuccess = result.some((r: any) => r.status === 'created' || r.status === 'created-appended');
+
+    // Generate PDF audit trail
+    const timestamp = new Date().toISOString();
+    const pdfPath = await generateAuditPDF({
+      operation: 'Sub Category Creation',
+      timestamp,
+      adminUser: username,
+      baseUrl,
+      results: { subCategory: result }
+    });
+
+    const fileName = pdfPath.split(/[/\\]/).pop() || 'audit-report.pdf';
+    automationEvents.emit('log', `✓ PDF audit report generated: ${fileName}`);
+
+    res.json({
+      success: hasSuccess,
+      result,
+      pdfFileName: fileName,
+      pdfDownloadUrl: `/download-audit/${fileName}`
+    });
+  } catch (err) {
+    automationEvents.emit('error', `Sub Category creation failed: ${String(err)}`);
+    try {
+      const timestamp = new Date().toISOString();
+      const pdfPath = await generateAuditPDF({
+        operation: 'Sub Category Creation',
+        timestamp,
+        adminUser: username,
+        baseUrl,
+        results: { subCategory: [{ subCategory: subCategories[0]?.subCategoryName || 'N/A', status: 'error', message: String(err) }] }
+      });
+      const fileName = pdfPath.split(/[/\\]/).pop() || 'audit-report.pdf';
+      res.status(500).json({ success: false, message: String(err), pdfFileName: fileName, pdfDownloadUrl: `/download-audit/${fileName}` });
+    } catch {
+      res.status(500).json({ success: false, message: String(err) });
+    }
+  }
+});
+
+// ===================== CREATE FUNCTIONAL ROLES =====================
+app.post('/run/createFunctionalRoles', async (req, res) => {
+  const { baseUrl, username, password, functionalRoles, duplicateStrategy } = req.body;
+
+  if (!baseUrl || !username || !password || !functionalRoles) {
+    automationEvents.emit('error', 'Missing required fields for functional role creation');
+    return res.status(400).json({ success: false, message: 'Missing required fields' });
+  }
+
+  if (!Array.isArray(functionalRoles) || functionalRoles.length === 0) {
+    automationEvents.emit('error', 'FunctionalRoles must be a non-empty array');
+    return res.status(400).json({ success: false, message: 'Functional Roles must be a non-empty array' });
+  }
+
+  try {
+    automationEvents.emit('log', 'Processing functional role creation request...');
+    const result = await runCreateFunctionalRoles(baseUrl, username, password, functionalRoles, duplicateStrategy);
+
+    const hasSuccess = result.some((r: any) => r.status === 'created' || r.status === 'created-appended');
+
+    // Generate PDF audit trail
+    const timestamp = new Date().toISOString();
+    const pdfPath = await generateAuditPDF({
+      operation: 'Functional Role Creation',
+      timestamp,
+      adminUser: username,
+      baseUrl,
+      results: { functionalRole: result }
+    });
+
+    const fileName = pdfPath.split(/[/\\]/).pop() || 'audit-report.pdf';
+    automationEvents.emit('log', `✓ PDF audit report generated: ${fileName}`);
+
+    res.json({
+      success: hasSuccess,
+      result,
+      pdfFileName: fileName,
+      pdfDownloadUrl: `/download-audit/${fileName}`
+    });
+  } catch (err) {
+    automationEvents.emit('error', `Functional Role creation failed: ${String(err)}`);
+    try {
+      const timestamp = new Date().toISOString();
+      const pdfPath = await generateAuditPDF({
+        operation: 'Functional Role Creation',
+        timestamp,
+        adminUser: username,
+        baseUrl,
+        results: { functionalRole: [{ functionalRole: functionalRoles[0]?.name || 'N/A', status: 'error', message: String(err) }] }
+      });
+      const fileName = pdfPath.split(/[/\\]/).pop() || 'audit-report.pdf';
+      res.status(500).json({ success: false, message: String(err), pdfFileName: fileName, pdfDownloadUrl: `/download-audit/${fileName}` });
+    } catch {
+      res.status(500).json({ success: false, message: String(err) });
+    }
+  }
+});
+
+// ===================== NATURAL LANGUAGE AUTOMATION ENDPOINT =====================
+
+app.post('/run/nlp-automation', async (req, res) => {
+  const { baseUrl, username, password, command } = req.body;
+
+  // Only command is required for standalone AI automation
+  if (!command) {
+    automationEvents.emit('error', 'Command is required for AI automation');
+    return res.status(400).json({ success: false, message: 'Command is required' });
+  }
+
+  try {
+    automationEvents.emit('log', '🤖 Processing AI automation request...');
+
+    // Use provided credentials or empty strings (AI will work without them)
+    const result = await executeNLPCommand(
+      baseUrl || '',
+      username || '',
+      password || '',
+      command
+    );
+
+    // Generate PDF audit trail
+    const timestamp = new Date().toISOString();
+    const pdfPath = await generateAuditPDF({
+      operation: 'AI Browser Automation',
+      timestamp,
+      adminUser: username || 'AI User',
+      baseUrl: baseUrl || 'Command-driven',
+      results: { nlp: result }
+    });
+
+    const fileName = pdfPath.split(/[/\\]/).pop() || 'audit-report.pdf';
+    automationEvents.emit('log', `✓ PDF audit report generated: ${fileName}`);
+
+    res.json({
+      success: result.success,
+      result,
+      pdfFileName: fileName,
+      pdfDownloadUrl: `/download-audit/${fileName}`
+    });
+  } catch (err) {
+    automationEvents.emit('error', `AI automation failed: ${String(err)}`);
     res.status(500).json({ success: false, message: String(err) });
   }
 });
@@ -383,7 +744,133 @@ app.get('/audit-reports', (req, res) => {
 
 
 
+// ===================== OLLAMA AI CHAT ENDPOINTS =====================
+
+/**
+ * Main Ollama AI Chat endpoint — understands natural language and drives browser
+ */
+app.post('/run/ollama-chat', async (req, res) => {
+  const { message } = req.body;
+
+  if (!message || !message.trim()) {
+    return res.status(400).json({ success: false, message: 'Message is required' });
+  }
+
+  // Safety timeout to prevent continuous loading in UI
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    setTimeout(() => reject(new Error('AI response timed out (300s). Please try again.')), 300000);
+  });
+
+  try {
+    automationEvents.emit('log', `💬 Ollama Chat: "${message}"`);
+    const engine = getOrCreateEngine(''); // API Key not needed for local Ollama
+
+    // Race the processing against a 90s timeout
+    const result = await Promise.race([
+      engine.sendMessage(message),
+      timeoutPromise
+    ]);
+
+    res.json(result);
+  } catch (err) {
+    const errMsg = String(err);
+    console.error('[Ollama API] Error:', errMsg);
+    automationEvents.emit('error', `Ollama chat failed: ${errMsg}`);
+    res.status(500).json({
+      success: false,
+      reply: `❌ Request Error: ${errMsg}`,
+      message: errMsg
+    });
+  }
+});
+
+/**
+ * Close the browser session
+ */
+app.post('/run/ollama-close', async (_req, res) => {
+  try {
+    await closeEngine();
+    res.json({ success: true, message: 'Browser session closed.' });
+  } catch (err) {
+    res.status(500).json({ success: false, message: String(err) });
+  }
+});
+
+/**
+ * Ollama status — check if configured
+ */
+app.get('/run/ollama-status', (_req, res) => {
+  res.json({
+    configured: true,
+    model: 'qwen2.5:7b',
+    setupUrl: 'http://localhost:11434'
+  });
+});
+
+// ===================== MCP AGENT ENDPOINTS =====================
+
+/**
+ * Main Playwright MCP integration endpoint
+ */
+app.post('/run/mcp-agent', async (req, res) => {
+  const { message, geminiApiKey } = req.body;
+
+  if (!message || !message.trim()) {
+    return res.status(400).json({ success: false, message: 'Message is required' });
+  }
+
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    setTimeout(() => reject(new Error('AI response timed out (300s). Please try again.')), 300000);
+  });
+
+  try {
+    automationEvents.emit('log', `💬 MCP Agent Request: "${message}"`);
+    const engine = getOrCreateMcpEngine();
+
+    const result = await Promise.race([
+      engine.runTask(message, geminiApiKey),
+      timeoutPromise
+    ]);
+
+    res.json(result);
+  } catch (err) {
+    const errMsg = String(err);
+    console.error('[MCP API] Error:', errMsg);
+    automationEvents.emit('error', `MCP agent failed: ${errMsg}`);
+    res.status(500).json({
+      success: false,
+      reply: `❌ Request Error: ${errMsg}`,
+      message: errMsg
+    });
+  }
+});
+
+/**
+ * Close the MCP browser session
+ */
+app.post('/run/mcp-close', async (_req, res) => {
+  try {
+    await closeMcpEngine();
+    res.json({ success: true, message: 'MCP Browser session closed.' });
+  } catch (err) {
+    res.status(500).json({ success: false, message: String(err) });
+  }
+});
+
 const port = process.env.PORT || 3000;
 
-app.listen(port, () => console.log(`Server listening on http://localhost:${port}`));
+app.listen(port, () => {
+  console.log(`Server listening on http://localhost:${port}`);
 
+  // ── Silent background warm-up ────────────────────────────────────────────
+  // Start the MCP agent + browser in the background so the first user message
+  // doesn't have to wait for the cold-start (npx @playwright/mcp takes ~15s).
+  setTimeout(() => {
+    const engine = getOrCreateMcpEngine();
+    engine.startAgent().then(() => {
+      console.log('[Warm-up] ✅ MCP browser agent is ready and warm.');
+    }).catch((err) => {
+      console.warn('[Warm-up] ⚠️ Background warm-up failed (will retry on first request):', String(err));
+    });
+  }, 1000); // 1s delay so the server is fully up first
+});

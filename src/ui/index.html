@@ -53,6 +53,38 @@
         <span class="status-dot"></span>
         <span>System Active</span>
       </div>
+      <a href="ai-automation.html" style="
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 16px;
+        background: linear-gradient(135deg, #00A3E0 0%, #0052A5 100%);
+        color: white;
+        text-decoration: none;
+        border-radius: 6px;
+        font-weight: 600;
+        font-size: 13px;
+        margin-left: 15px;
+        transition: transform 0.2s;
+      " onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
+        🤖 AI Automation
+      </a>
+      <a href="ollama-chat.html" style="
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 16px;
+        background: linear-gradient(135deg, #1a6b3c 0%, #2ea043 100%);
+        color: white;
+        text-decoration: none;
+        border-radius: 6px;
+        font-weight: 600;
+        font-size: 13px;
+        margin-left: 8px;
+        transition: transform 0.2s;
+      " onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
+        ✨ Smart IMS AI Chat
+      </a>
     </div>
   </header>
 
@@ -101,31 +133,41 @@
       <section class="card fade-in">
         <h2>⚙️ Connection Settings</h2>
 
-        <label>Base URL</label>
-        <input id="baseUrl" type="url" placeholder="https://vgusdev01.valgenesis.net/..."
-          value="https://vgusdev01.valgenesis.net/PIHEALTH-DEV/login/login.aspx?ReturnUrl=/PIHEALTH-DEV/default.aspx">
+        <div class="input-group">
+          <label>Base URL</label>
+          <input id="baseUrl" type="url" placeholder="https://vgusdev01.valgenesis.net/..."
+            value="https://vgusdev01.valgenesis.net/PIHEALTH-DEV/login/login.aspx?ReturnUrl=/PIHEALTH-DEV/default.aspx">
+        </div>
 
         <div class="grid-3">
-          <div>
+          <div class="input-group">
             <label>Username</label>
             <input id="username" placeholder="Enter username" type="text">
           </div>
 
-          <div>
+          <div class="input-group">
             <label>Password</label>
             <input id="password" placeholder="Enter password" type="password">
           </div>
         </div>
 
-        <label>Select Functionality</label>
-        <select id="featureSelect">
-          <option value="">-- Choose an Option --</option>
-          <option value="roles">🔐 Create Role</option>
-          <option value="departments">🏢 Create Department</option>
-          <option value="users">👤 Create User</option>
-          <option value="deactivateUsers">🚫 Deactivate User</option>
-          <option value="unified">⚡ Complete Setup (Role → Dept → User → Deactivate)</option>
-        </select>
+        <div class="input-group">
+          <label>Select Category</label>
+          <select id="categorySelect">
+            <option value="">-- Choose a Category --</option>
+            <option value="ai">🤖 AI Automation</option>
+            <option value="userManagement">👥 User Management</option>
+            <option value="systemModule">⚙️ System Module</option>
+            <option value="advanced">⚡ Advanced Flows</option>
+          </select>
+        </div>
+
+        <div class="input-group">
+          <label id="featureSelectLabel" style="display:none; margin-top: 12px;">Select Functionality</label>
+          <select id="featureSelect" style="display:none;">
+            <option value="">-- Choose an Option --</option>
+          </select>
+        </div>
 
         <!-- Dynamic Input Container -->
         <div id="featureInputs" class="dynamic-box"></div>
@@ -153,6 +195,12 @@
       <div id="resultsList"></div>
     </section>
 
+    <!-- PDF Audit Report Section (Hidden by default) -->
+    <section class="card" id="pdfSection" style="display:none;">
+      <h2>📄 Audit Report</h2>
+      <div id="pdfDownload"></div>
+    </section>
+
   </main>
 
   <!-- Footer -->
@@ -163,6 +211,7 @@
 
   <!-- Application Script -->
   <script src="app.js" defer></script>
+  <script src="ui-interactions.js" defer></script>
 
 </body>
 

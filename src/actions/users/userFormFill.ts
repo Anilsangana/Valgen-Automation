@@ -1,6 +1,6 @@
 import { Page, FrameLocator } from 'playwright';
 import { automationEvents } from '../../core/browser';
-import { waitForOverlayGone } from '../../core/navigation';
+import { waitForOverlayGone, waitForIframeLoaderGone } from '../../core/navigation';
 
 export interface UserFormData {
     FirstName: string;
@@ -25,13 +25,13 @@ export async function fillUserCreationForm(
 
     // Select Role if provided
     if (user.Role) {
-        await page.waitForLoadState('domcontentloaded');
+        await waitForIframeLoaderGone(page, 10000);
         await frame.locator('#ddlRole').selectOption({ label: user.Role });
     } else {
         automationEvents.emit('log', 'No role specified, skipping role selection.');
     }
-    await page.waitForTimeout(2000);
-    await page.waitForLoadState('domcontentloaded');
+    await waitForOverlayGone(page, 15000);
+    await waitForIframeLoaderGone(page, 15000);
 
     // Select Department if provided
     if (user.Department) {
@@ -41,8 +41,8 @@ export async function fillUserCreationForm(
             automationEvents.emit('error', `Department '${user.Department}' not found in dropdown, skipping department selection`);
         }
     }
-    await page.waitForTimeout(1000);
-    await page.waitForLoadState('domcontentloaded');
+    await waitForOverlayGone(page, 15000);
+    await waitForIframeLoaderGone(page, 15000);
 
     // Fill First Name
     await frame.locator('#txtFirstName').fill(user.FirstName);
@@ -94,8 +94,12 @@ export async function navigateToUserCreateForm(page: Page): Promise<FrameLocator
     await waitForOverlayGone(page);
 
     const frame = page.frameLocator('#framecontent');
+    await waitForIframeLoaderGone(page, 15000);
 
     await frame.locator('#liCreateUser').click().catch(() => { });
+    await waitForOverlayGone(page, 15000);
+    await waitForIframeLoaderGone(page, 15000);
+
     await frame.locator('#divCreateUser').waitFor({ state: 'visible' });
 
     return frame;

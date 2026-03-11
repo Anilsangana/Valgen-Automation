@@ -12,8 +12,7 @@ async function configureRolePermissions(frame, page, roleName) {
     await frame.locator('#txtComments').fill(comment);
     await page.waitForTimeout(1000);
     await frame.locator('#btnSave').click();
-    await page.waitForTimeout(1000);
-    await page.waitForLoadState('domcontentloaded');
+    await (0, navigation_1.waitForOverlayGone)(page, 15000);
     const successMessage = frame.locator('#val1_lblCM', { hasText: 'Role Profile has been Updated' });
     await successMessage.waitFor({ state: 'visible', timeout: 8000 });
     if (successMessage) {
@@ -42,8 +41,8 @@ async function createRole(page, roles, options = {}) {
             await (0, navigation_1.waitForPostback)(page, 15000);
             await (0, navigation_1.waitForOverlayGone)(page);
             const frame = page.frameLocator('#framecontent');
-            // ===================== Role Creation =====================
-            await page.waitForTimeout(3000);
+            // Wait for iframe loader to disappear and form to be ready
+            await (0, navigation_1.waitForIframeLoaderGone)(page, 15000);
             await page.mouse.move(1, 1);
             await frame.locator('#ddlRoleType')
                 .selectOption('Review and Approval');
@@ -56,7 +55,7 @@ async function createRole(page, roles, options = {}) {
             await page.waitForTimeout(500);
             await page.mouse.move(200, 200);
             await frame.locator('#btnSubmit').click();
-            await page.waitForLoadState('load');
+            await (0, navigation_1.waitForOverlayGone)(page, 15000);
             // ===================== Popup Detection =====================
             const successPopup = frame.locator('#val1_lblCM');
             const duplicatePopup = frame.locator('#val1_lblErrorAlert', { hasText: 'Role Name must be unique' });

@@ -1,6 +1,6 @@
 import { Page, FrameLocator } from 'playwright';
 import { automationEvents } from '../../core/browser';
-import { waitForPostback } from '../../core/navigation';
+import { waitForPostback, waitForOverlayGone } from '../../core/navigation';
 
 /**
  * Submit user creation form
@@ -12,7 +12,7 @@ export async function submitUserCreationForm(
 ): Promise<void> {
     automationEvents.emit('log', `Submitting user: ${userEmail}`);
     await frame.locator('#btnUpdate').click();
-    await waitForPostback(page, 10000); // Wait for submit postback
+    await waitForOverlayGone(page, 15000); // Wait for submit postback
 }
 
 /**
@@ -25,5 +25,5 @@ export async function handleSuccessPopup(
 ): Promise<void> {
     automationEvents.emit('log', `User created successfully: ${userEmail}`);
     await frame.locator('#btnMessageOk').click();
-    await page.waitForLoadState('domcontentloaded');
+    await waitForOverlayGone(page, 15000);
 }

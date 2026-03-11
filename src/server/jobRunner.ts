@@ -31,6 +31,10 @@ import { deactivateUsers } from '../actions/users/deactivateUsers';
 import { assignRole } from '../actions/assignRole';
 
 import { createDepartment } from '../actions/createDepartment';
+import { createCategory } from '../actions/createCategory';
+import { createSubCategory } from '../actions/createSubCategory';
+import { createGroup } from '../actions/createGroup';
+import { createFunctionalRole } from '../actions/createFunctionalRole';
 
 
 
@@ -893,5 +897,167 @@ export async function runCreateDepartments(
   }
 }
 
+// ===================== CREATE CATEGORIES =====================
+export async function runCreateCategories(
+  baseUrl: string,
+  username: string,
+  password: string,
+  categories: Array<{ name: string; prefix?: string; description?: string }>,
+  duplicateStrategy: 'skip' | 'append' | 'stop' = 'skip'
+) {
+  // Backend validation
+  if (!baseUrl || !username || !password || !categories) {
+    throw new Error('Missing required fields: baseUrl, username, password, categories');
+  }
 
+  if (!Array.isArray(categories) || categories.length === 0) {
+    throw new Error('Categories must be a non-empty array');
+  }
 
+  const { browser, context } = await launchBrowser({ headless: false });
+  const page = await newPage(context);
+
+  automationEvents.emit('log', 'Starting Create Categories job');
+
+  try {
+    automationEvents.emit('log', `Attempting to login with username: ${username}`);
+    const loginResult = await login(page, baseUrl, username, password);
+
+    if (!loginResult.success) throw new Error('Login failed - Please verify credentials and Base URL');
+
+    automationEvents.emit('log', `Processing ${categories.length} category(ies) for creation`);
+    const result = await createCategory(page, categories, { duplicateStrategy });
+
+    automationEvents.emit('log', 'Category creation completed, result length: ' + result.length);
+
+    return result;
+  } catch (err) {
+    automationEvents.emit('error', `Error during category creation: ${String(err)}`);
+    throw err;
+  } finally {
+    await browser.close();
+  }
+}
+
+// ===================== CREATE GROUPS =====================
+export async function runCreateGroups(
+  baseUrl: string,
+  username: string,
+  password: string,
+  groups: Array<{ name: string; groupType?: string; description?: string; selectAllUsers?: boolean }>,
+  duplicateStrategy: 'skip' | 'append' | 'stop' = 'skip'
+) {
+  if (!baseUrl || !username || !password || !groups) {
+    throw new Error('Missing required fields: baseUrl, username, password, groups');
+  }
+
+  if (!Array.isArray(groups) || groups.length === 0) {
+    throw new Error('Groups must be a non-empty array');
+  }
+
+  const { browser, context } = await launchBrowser({ headless: false });
+  const page = await newPage(context);
+
+  automationEvents.emit('log', 'Starting Create Groups job');
+
+  try {
+    automationEvents.emit('log', `Attempting to login with username: ${username}`);
+    const loginResult = await login(page, baseUrl, username, password);
+
+    if (!loginResult.success) throw new Error('Login failed - Please verify credentials and Base URL');
+
+    automationEvents.emit('log', `Processing ${groups.length} group(s) for creation`);
+    const result = await createGroup(page, groups as any[], { duplicateStrategy });
+
+    automationEvents.emit('log', 'Group creation completed, result length: ' + result.length);
+
+    return result;
+  } catch (err) {
+    automationEvents.emit('error', `Error during group creation: ${String(err)}`);
+    throw err;
+  } finally {
+    await browser.close();
+  }
+}
+
+// ===================== CREATE SUB CATEGORIES =====================
+export async function runCreateSubCategories(
+  baseUrl: string,
+  username: string,
+  password: string,
+  subCategories: Array<{ categoryName: string; subCategoryName: string; prefix?: string; description?: string }>,
+  duplicateStrategy: 'skip' | 'append' | 'stop' = 'skip'
+) {
+  if (!baseUrl || !username || !password || !subCategories) {
+    throw new Error('Missing required fields: baseUrl, username, password, subCategories');
+  }
+
+  if (!Array.isArray(subCategories) || subCategories.length === 0) {
+    throw new Error('Sub Categories must be a non-empty array');
+  }
+
+  const { browser, context } = await launchBrowser({ headless: false });
+  const page = await newPage(context);
+
+  automationEvents.emit('log', 'Starting Create Sub Categories job');
+
+  try {
+    automationEvents.emit('log', `Attempting to login with username: ${username}`);
+    const loginResult = await login(page, baseUrl, username, password);
+
+    if (!loginResult.success) throw new Error('Login failed - Please verify credentials and Base URL');
+
+    automationEvents.emit('log', `Processing ${subCategories.length} sub category(ies) for creation`);
+    const result = await createSubCategory(page, subCategories, { duplicateStrategy });
+
+    automationEvents.emit('log', 'Sub Category creation completed, result length: ' + result.length);
+
+    return result;
+  } catch (err) {
+    automationEvents.emit('error', `Error during sub category creation: ${String(err)}`);
+    throw err;
+  } finally {
+    await browser.close();
+  }
+}
+
+// ===================== CREATE FUNCTIONAL ROLES =====================
+export async function runCreateFunctionalRoles(
+  baseUrl: string,
+  username: string,
+  password: string,
+  functionalRoles: Array<{ name: string; prefix?: string; description?: string }>,
+  duplicateStrategy: 'skip' | 'append' | 'stop' = 'skip'
+) {
+  if (!baseUrl || !username || !password || !functionalRoles) {
+    throw new Error('Missing required fields: baseUrl, username, password, functionalRoles');
+  }
+
+  if (!Array.isArray(functionalRoles) || functionalRoles.length === 0) {
+    throw new Error('FunctionalRoles must be a non-empty array');
+  }
+
+  const { browser, context } = await launchBrowser({ headless: false });
+  const page = await newPage(context);
+
+  automationEvents.emit('log', 'Starting Create Functional Roles job');
+
+  try {
+    automationEvents.emit('log', `Attempting to login with username: ${username}`);
+    const loginResult = await login(page, baseUrl, username, password);
+
+    if (!loginResult.success) throw new Error('Login failed - Please verify credentials and Base URL');
+
+    automationEvents.emit('log', `Processing ${functionalRoles.length} functional role(s) for creation`);
+    const result = await createFunctionalRole(page, functionalRoles, { duplicateStrategy });
+
+    automationEvents.emit('log', 'Functional Role creation completed, result length: ' + result.length);
+
+    return result;
+  } catch (err) {
+    automationEvents.emit('error', `Error during functional role creation: ${String(err)}`);
+    throw err;
+  } finally {
+    await browser.close();
+  }
+}

@@ -9,6 +9,10 @@ exports.runAll = runAll;
 exports.runUnifiedFlow = runUnifiedFlow;
 exports.runDeactivateUsers = runDeactivateUsers;
 exports.runCreateDepartments = runCreateDepartments;
+exports.runCreateCategories = runCreateCategories;
+exports.runCreateGroups = runCreateGroups;
+exports.runCreateSubCategories = runCreateSubCategories;
+exports.runCreateFunctionalRoles = runCreateFunctionalRoles;
 const path_1 = __importDefault(require("path"));
 const fs_1 = __importDefault(require("fs"));
 const browser_1 = require("../core/browser");
@@ -19,6 +23,10 @@ const createUser_1 = require("../actions/users/createUser");
 const deactivateUsers_1 = require("../actions/users/deactivateUsers");
 const assignRole_1 = require("../actions/assignRole");
 const createDepartment_1 = require("../actions/createDepartment");
+const createCategory_1 = require("../actions/createCategory");
+const createSubCategory_1 = require("../actions/createSubCategory");
+const createGroup_1 = require("../actions/createGroup");
+const createFunctionalRole_1 = require("../actions/createFunctionalRole");
 // ===================== CREATE ROLES =====================
 async function runCreateRoles(baseUrl, username, password, roleName, duplicateStrategy = 'skip', permissions) {
     // Backend validation
@@ -303,6 +311,123 @@ async function runCreateDepartments(baseUrl, username, password, departments) {
     }
     catch (err) {
         browser_1.automationEvents.emit('error', `Error during department creation: ${String(err)}`);
+        throw err;
+    }
+    finally {
+        await browser.close();
+    }
+}
+// ===================== CREATE CATEGORIES =====================
+async function runCreateCategories(baseUrl, username, password, categories, duplicateStrategy = 'skip') {
+    // Backend validation
+    if (!baseUrl || !username || !password || !categories) {
+        throw new Error('Missing required fields: baseUrl, username, password, categories');
+    }
+    if (!Array.isArray(categories) || categories.length === 0) {
+        throw new Error('Categories must be a non-empty array');
+    }
+    const { browser, context } = await (0, browser_1.launchBrowser)({ headless: false });
+    const page = await (0, browser_1.newPage)(context);
+    browser_1.automationEvents.emit('log', 'Starting Create Categories job');
+    try {
+        browser_1.automationEvents.emit('log', `Attempting to login with username: ${username}`);
+        const loginResult = await (0, login_1.login)(page, baseUrl, username, password);
+        if (!loginResult.success)
+            throw new Error('Login failed - Please verify credentials and Base URL');
+        browser_1.automationEvents.emit('log', `Processing ${categories.length} category(ies) for creation`);
+        const result = await (0, createCategory_1.createCategory)(page, categories, { duplicateStrategy });
+        browser_1.automationEvents.emit('log', 'Category creation completed, result length: ' + result.length);
+        return result;
+    }
+    catch (err) {
+        browser_1.automationEvents.emit('error', `Error during category creation: ${String(err)}`);
+        throw err;
+    }
+    finally {
+        await browser.close();
+    }
+}
+// ===================== CREATE GROUPS =====================
+async function runCreateGroups(baseUrl, username, password, groups, duplicateStrategy = 'skip') {
+    if (!baseUrl || !username || !password || !groups) {
+        throw new Error('Missing required fields: baseUrl, username, password, groups');
+    }
+    if (!Array.isArray(groups) || groups.length === 0) {
+        throw new Error('Groups must be a non-empty array');
+    }
+    const { browser, context } = await (0, browser_1.launchBrowser)({ headless: false });
+    const page = await (0, browser_1.newPage)(context);
+    browser_1.automationEvents.emit('log', 'Starting Create Groups job');
+    try {
+        browser_1.automationEvents.emit('log', `Attempting to login with username: ${username}`);
+        const loginResult = await (0, login_1.login)(page, baseUrl, username, password);
+        if (!loginResult.success)
+            throw new Error('Login failed - Please verify credentials and Base URL');
+        browser_1.automationEvents.emit('log', `Processing ${groups.length} group(s) for creation`);
+        const result = await (0, createGroup_1.createGroup)(page, groups, { duplicateStrategy });
+        browser_1.automationEvents.emit('log', 'Group creation completed, result length: ' + result.length);
+        return result;
+    }
+    catch (err) {
+        browser_1.automationEvents.emit('error', `Error during group creation: ${String(err)}`);
+        throw err;
+    }
+    finally {
+        await browser.close();
+    }
+}
+// ===================== CREATE SUB CATEGORIES =====================
+async function runCreateSubCategories(baseUrl, username, password, subCategories, duplicateStrategy = 'skip') {
+    if (!baseUrl || !username || !password || !subCategories) {
+        throw new Error('Missing required fields: baseUrl, username, password, subCategories');
+    }
+    if (!Array.isArray(subCategories) || subCategories.length === 0) {
+        throw new Error('Sub Categories must be a non-empty array');
+    }
+    const { browser, context } = await (0, browser_1.launchBrowser)({ headless: false });
+    const page = await (0, browser_1.newPage)(context);
+    browser_1.automationEvents.emit('log', 'Starting Create Sub Categories job');
+    try {
+        browser_1.automationEvents.emit('log', `Attempting to login with username: ${username}`);
+        const loginResult = await (0, login_1.login)(page, baseUrl, username, password);
+        if (!loginResult.success)
+            throw new Error('Login failed - Please verify credentials and Base URL');
+        browser_1.automationEvents.emit('log', `Processing ${subCategories.length} sub category(ies) for creation`);
+        const result = await (0, createSubCategory_1.createSubCategory)(page, subCategories, { duplicateStrategy });
+        browser_1.automationEvents.emit('log', 'Sub Category creation completed, result length: ' + result.length);
+        return result;
+    }
+    catch (err) {
+        browser_1.automationEvents.emit('error', `Error during sub category creation: ${String(err)}`);
+        throw err;
+    }
+    finally {
+        await browser.close();
+    }
+}
+// ===================== CREATE FUNCTIONAL ROLES =====================
+async function runCreateFunctionalRoles(baseUrl, username, password, functionalRoles, duplicateStrategy = 'skip') {
+    if (!baseUrl || !username || !password || !functionalRoles) {
+        throw new Error('Missing required fields: baseUrl, username, password, functionalRoles');
+    }
+    if (!Array.isArray(functionalRoles) || functionalRoles.length === 0) {
+        throw new Error('FunctionalRoles must be a non-empty array');
+    }
+    const { browser, context } = await (0, browser_1.launchBrowser)({ headless: false });
+    const page = await (0, browser_1.newPage)(context);
+    browser_1.automationEvents.emit('log', 'Starting Create Functional Roles job');
+    try {
+        browser_1.automationEvents.emit('log', `Attempting to login with username: ${username}`);
+        const loginResult = await (0, login_1.login)(page, baseUrl, username, password);
+        if (!loginResult.success)
+            throw new Error('Login failed - Please verify credentials and Base URL');
+        browser_1.automationEvents.emit('log', `Processing ${functionalRoles.length} functional role(s) for creation`);
+        const result = await (0, createFunctionalRole_1.createFunctionalRole)(page, functionalRoles, { duplicateStrategy });
+        browser_1.automationEvents.emit('log', 'Functional Role creation completed, result length: ' + result.length);
+        return result;
+    }
+    catch (err) {
+        browser_1.automationEvents.emit('error', `Error during functional role creation: ${String(err)}`);
         throw err;
     }
     finally {

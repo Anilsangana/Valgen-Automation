@@ -155,6 +155,71 @@ async function generateAuditPDF(data) {
                     return fields;
                 });
             }
+            // Category Creation Results
+            if (data.results.category && data.results.category.length > 0) {
+                addEnterpriseResultSection(doc, 'CATEGORY CREATION', data.results.category, (item) => {
+                    const fields = [
+                        { label: 'Category Name', value: item.category || item.name || 'N/A' },
+                        { label: 'Prefix', value: item.prefix || 'N/A' },
+                        { label: 'Status', value: item.status || 'N/A' },
+                        { label: 'Created As', value: item.createdAs || item.category || 'N/A' },
+                        { label: 'Description', value: item.description || 'N/A' }
+                    ];
+                    if (item.timestamp) {
+                        fields.push({ label: 'Timestamp', value: formatTimestamp(item.timestamp) });
+                    }
+                    return fields;
+                });
+            }
+            // Sub Category Creation Results
+            if (data.results.subCategory && data.results.subCategory.length > 0) {
+                addEnterpriseResultSection(doc, 'SUB CATEGORY CREATION', data.results.subCategory, (item) => {
+                    const fields = [
+                        { label: 'Category', value: item.category || 'N/A' },
+                        { label: 'Sub Category', value: item.subCategory || item.name || 'N/A' },
+                        { label: 'Prefix', value: item.prefix || 'N/A' },
+                        { label: 'Status', value: item.status || 'N/A' },
+                        { label: 'Created As', value: item.createdAs || item.subCategory || 'N/A' },
+                        { label: 'Description', value: item.description || 'N/A' }
+                    ];
+                    if (item.timestamp) {
+                        fields.push({ label: 'Timestamp', value: formatTimestamp(item.timestamp) });
+                    }
+                    return fields;
+                });
+            }
+            // Group Creation Results
+            if (data.results.group && data.results.group.length > 0) {
+                addEnterpriseResultSection(doc, 'GROUP CREATION', data.results.group, (item) => {
+                    const fields = [
+                        { label: 'Group Name', value: item.group || item.name || 'N/A' },
+                        { label: 'Group Type', value: item.groupType || 'N/A' },
+                        { label: 'Status', value: item.status || 'N/A' },
+                        { label: 'Created As', value: item.createdAs || item.group || 'N/A' },
+                        { label: 'Description', value: item.description || 'N/A' }
+                    ];
+                    if (item.timestamp) {
+                        fields.push({ label: 'Timestamp', value: formatTimestamp(item.timestamp) });
+                    }
+                    return fields;
+                });
+            }
+            // Functional Role Creation Results
+            if (data.results.functionalRole && data.results.functionalRole.length > 0) {
+                addEnterpriseResultSection(doc, 'FUNCTIONAL ROLE CREATION', data.results.functionalRole, (item) => {
+                    const fields = [
+                        { label: 'Functional Role Name', value: item.functionalRole || item.name || 'N/A' },
+                        { label: 'Prefix', value: item.prefix || 'N/A' },
+                        { label: 'Status', value: item.status || 'N/A' },
+                        { label: 'Created As', value: item.createdAs || item.functionalRole || 'N/A' },
+                        { label: 'Description', value: item.description || 'N/A' }
+                    ];
+                    if (item.timestamp) {
+                        fields.push({ label: 'Timestamp', value: formatTimestamp(item.timestamp) });
+                    }
+                    return fields;
+                });
+            }
             // User Creation Results
             if (data.results.user && data.results.user.length > 0) {
                 addEnterpriseResultSection(doc, 'USER CREATION', data.results.user, (item) => {
@@ -189,6 +254,140 @@ async function generateAuditPDF(data) {
                     }
                     return fields;
                 });
+            }
+            // Natural Language Automation Results
+            if (data.results.nlp) {
+                const nlpData = data.results.nlp;
+                const resultsHeaderY = doc.y;
+                // NLP Command Section
+                doc.rect(50, resultsHeaderY, 495, 28)
+                    .fillAndStroke('#EDF2F7', '#CBD5E0');
+                doc.fontSize(11)
+                    .font('Helvetica-Bold')
+                    .fillColor('#1A365D')
+                    .text('NATURAL LANGUAGE COMMAND', 60, resultsHeaderY + 9);
+                doc.y = resultsHeaderY + 35;
+                // Command box
+                const commandBoxY = doc.y;
+                doc.rect(50, commandBoxY, 495, 60)
+                    .stroke('#E2E8F0');
+                doc.fontSize(8)
+                    .font('Helvetica-Bold')
+                    .fillColor('#4A5568')
+                    .text('Command:', 65, commandBoxY + 12);
+                doc.fontSize(8)
+                    .font('Helvetica')
+                    .fillColor('#2D3748')
+                    .text(nlpData.command || 'N/A', 65, commandBoxY + 28, { width: 465 });
+                doc.y = commandBoxY + 70;
+                doc.moveDown(0.5);
+                // Results breakdown
+                if (nlpData.result) {
+                    const result = nlpData.result;
+                    if (result.login) {
+                        addEnterpriseResultSection(doc, 'LOGIN EXECUTION', [result.login], (item) => {
+                            return [
+                                { label: 'Status', value: item.status || 'N/A' },
+                                { label: 'Username', value: item.username || 'N/A' }
+                            ];
+                        });
+                    }
+                    if (result.role) {
+                        addEnterpriseResultSection(doc, 'ROLE CREATION', [result.role], (item) => {
+                            return [
+                                { label: 'Status', value: item.status || 'N/A' },
+                                { label: 'Role Name', value: item.name || 'N/A' },
+                                { label: 'Role Type', value: item.type || 'N/A' }
+                            ];
+                        });
+                    }
+                    if (result.department) {
+                        addEnterpriseResultSection(doc, 'DEPARTMENT CREATION', [result.department], (item) => {
+                            return [
+                                { label: 'Status', value: item.status || 'N/A' },
+                                { label: 'Department Name', value: item.name || 'N/A' }
+                            ];
+                        });
+                    }
+                    if (result.user) {
+                        addEnterpriseResultSection(doc, 'USER CREATION', [result.user], (item) => {
+                            return [
+                                { label: 'Status', value: item.status || 'N/A' },
+                                { label: 'Email', value: item.email || 'N/A' },
+                                { label: 'Role', value: item.role || 'N/A' },
+                                { label: 'Department', value: item.department || 'N/A' }
+                            ];
+                        });
+                    }
+                    // Embed screenshot if available
+                    if (result.screenshot) {
+                        doc.moveDown(1);
+                        // Check if we need a new page
+                        if (doc.y > 650) {
+                            doc.addPage();
+                            doc.y = 60;
+                        }
+                        const screenshotHeaderY = doc.y;
+                        doc.rect(50, screenshotHeaderY, 495, 28)
+                            .fillAndStroke('#EDF2F7', '#CBD5E0');
+                        doc.fontSize(11)
+                            .font('Helvetica-Bold')
+                            .fillColor('#1A365D')
+                            .text('📸 CAPTURED SCREENSHOT', 60, screenshotHeaderY + 9);
+                        doc.y = screenshotHeaderY + 40;
+                        // Try to embed the screenshot image
+                        try {
+                            const screenshotPath = path_1.default.join(process.cwd(), result.screenshot);
+                            if (fs_1.default.existsSync(screenshotPath)) {
+                                // Check if we need a new page for the image
+                                if (doc.y > 720) {
+                                    doc.addPage();
+                                    doc.y = 60;
+                                }
+                                const imageY = doc.y;
+                                // Add image with reasonable size (fit within margins)
+                                // Max width: 495 (page width - margins), max height: ~400
+                                doc.image(screenshotPath, 50, imageY, {
+                                    fit: [495, 400],
+                                    align: 'center'
+                                });
+                                // Move cursor below image
+                                doc.y = imageY + 410;
+                                // Add caption
+                                doc.fontSize(8)
+                                    .font('Helvetica')
+                                    .fillColor('#718096')
+                                    .text(`Screenshot: ${result.screenshot}`, 50, doc.y, {
+                                    align: 'center',
+                                    width: 495
+                                });
+                                doc.moveDown(1);
+                            }
+                            else {
+                                // Screenshot file not found, just mention it
+                                doc.fontSize(9)
+                                    .font('Helvetica')
+                                    .fillColor('#4A5568')
+                                    .text(`Screenshot path: ${result.screenshot}`, 60, doc.y);
+                                doc.fontSize(8)
+                                    .fillColor('#E53E3E')
+                                    .text('(Screenshot file not found at PDF generation time)', 60, doc.y + 15);
+                                doc.moveDown(2);
+                            }
+                        }
+                        catch (error) {
+                            // Error loading screenshot
+                            doc.fontSize(9)
+                                .font('Helvetica')
+                                .fillColor('#4A5568')
+                                .text(`Screenshot path: ${result.screenshot}`, 60, doc.y);
+                            doc.fontSize(8)
+                                .fillColor('#E53E3E')
+                                .text(`Error embedding screenshot: ${String(error)}`, 60, doc.y + 15);
+                            doc.moveDown(2);
+                        }
+                    }
+                }
             }
             // ================== ADD FOOTERS TO ALL PAGES ==================
             const range = doc.bufferedPageRange();

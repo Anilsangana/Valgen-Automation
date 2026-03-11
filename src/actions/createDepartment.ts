@@ -1,6 +1,6 @@
 import { Page } from 'playwright';
 import { automationEvents } from '../core/browser';
-import { waitForPostback, waitForOverlayGone } from '../core/navigation';
+import { waitForPostback, waitForOverlayGone, waitForIframeLoaderGone } from '../core/navigation';
 import { AdministrationPage } from '../pages/administrationPage';
 
 export type CreateDepartmentOptions = {
@@ -27,8 +27,8 @@ export async function createDepartment(
 
       const frame = page.frameLocator('#framecontent');
 
-      // ===================== FORM FILLING =====================
-      await page.waitForTimeout(1000);
+      // Wait for iframe loader to disappear and form to be ready
+      await waitForIframeLoaderGone(page, 15000);
 
       await frame.locator('#txtboxDepartmentName')
         .waitFor({ state: 'visible', timeout: 8000 });
@@ -50,7 +50,7 @@ export async function createDepartment(
 
       // ===================== SUBMIT =====================
       await frame.locator('#btnSubmit').click();
-      await page.waitForTimeout(2000);
+      await waitForOverlayGone(page, 15000);
 
 
       // ===================== POPUP DETECTION =====================

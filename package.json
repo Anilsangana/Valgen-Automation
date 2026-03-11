@@ -14,13 +14,14 @@
   "license": "ISC",
   "type": "commonjs",
   "devDependencies": {
+    "@playwright/mcp": "^0.0.68",
     "@playwright/test": "^1.57.0",
     "@types/body-parser": "^1.19.6",
     "@types/express": "^5.0.6",
     "@types/node": "^25.0.3",
     "@types/papaparse": "^5.5.2",
     "@types/pdfkit": "^0.17.4",
-    "dotenv": "^17.2.3",
+    "dotenv": "^17.3.1",
     "express": "^4.18.2",
     "papaparse": "^5.4.1",
     "playwright": "^1.57.0",
@@ -28,6 +29,10 @@
     "ws": "^8.13.0"
   },
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
+    "@modelcontextprotocol/sdk": "^1.27.1",
+    "groq-sdk": "^0.37.0",
+    "ollama": "^0.6.3",
     "pdfkit": "^0.17.2"
   }
 }

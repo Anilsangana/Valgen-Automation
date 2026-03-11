@@ -1,0 +1,825 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart IMS AI — ValGenesis Automation</title>
+    <meta name="description"
+        content="Chat with Smart IMS AI to automate your browser tasks using natural language. No code required.">
+    <link rel="icon" type="image/svg+xml" href="./favicon.svg">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* ─── Design Tokens ──────────────────────────────────────────── */
+        :root {
+            --bg: #09090b;
+            --bg-card: rgba(24, 24, 27, 0.85);
+            --bg-input: rgba(39, 39, 42, 0.8);
+            --bg-user: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+            --bg-ai: rgba(24, 24, 27, 0.6);
+            --border: rgba(255, 255, 255, 0.15);
+            --primary: #3b82f6;
+            --primary-dark: #8b5cf6;
+            --accent: #06b6d4;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --text: #f4f4f5;
+            --text-muted: #a1a1aa;
+            --text-subtle: #71717a;
+            --radius: 12px;
+            --radius-lg: 16px;
+            --shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -2px rgba(0, 0, 0, 0.15);
+        }
+
+        /* ─── Reset & Base ───────────────────────────────────────────── */
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        html,
+        body {
+            height: 100%;
+            font-family: 'Inter', sans-serif;
+            background: 
+              radial-gradient(circle at 15% 50%, rgba(59, 130, 246, 0.08), transparent 25%),
+              radial-gradient(circle at 85% 30%, rgba(139, 92, 246, 0.08), transparent 25%),
+              var(--bg);
+            color: var(--text);
+            overflow: hidden;
+        }
+
+        /* ─── Layout ─────────────────────────────────────────────────── */
+        .app {
+            display: grid;
+            grid-template-rows: auto 1fr auto;
+            height: 100vh;
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 0 16px;
+        }
+
+        /* ─── Topbar ─────────────────────────────────────────────────── */
+        .topbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 14px 0;
+            border-bottom: 1px solid var(--border);
+            gap: 12px;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .brand-icon {
+            width: 38px;
+            height: 38px;
+            background: linear-gradient(135deg, var(--primary-dark), var(--primary));
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+        }
+
+        .brand-name {
+            font-size: 17px;
+            font-weight: 700;
+        }
+
+        .brand-sub {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-top: 1px;
+        }
+
+        .topbar-actions {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 500;
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+            cursor: default;
+        }
+
+        .pill.online {
+            border-color: var(--success);
+            color: var(--success);
+        }
+
+        .pill.offline {
+            border-color: var(--danger);
+            color: var(--danger);
+        }
+
+        .pill-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        .pill.online .pill-dot {
+            background: var(--success);
+        }
+
+        .pill.offline .pill-dot {
+            background: var(--danger);
+            animation: none;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1
+            }
+
+            50% {
+                opacity: .4
+            }
+        }
+
+        .btn-icon {
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+            border-radius: 8px;
+            width: 34px;
+            height: 34px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 15px;
+            transition: all .2s;
+        }
+
+        .btn-icon:hover {
+            background: var(--bg-card);
+            color: var(--text);
+            border-color: var(--primary);
+        }
+
+        .back-link {
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            transition: color .2s;
+        }
+
+        .back-link:hover {
+            color: var(--primary);
+        }
+
+        /* ─── Chat Window ────────────────────────────────────────────── */
+        .chat-window {
+            display: flex;
+            flex-direction: column;
+            gap: 0;
+            overflow-y: auto;
+            padding: 24px 0 8px;
+            scroll-behavior: smooth;
+        }
+
+        .chat-window::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        .chat-window::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .chat-window::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 4px;
+        }
+
+        /* ─── Welcome Screen ─────────────────────────────────────────── */
+        .welcome {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            text-align: center;
+            gap: 20px;
+            padding: 40px 20px;
+            animation: fadeIn .5s ease;
+        }
+
+        .welcome-orb {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--primary-dark), var(--primary));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 36px;
+            box-shadow: 0 0 40px rgba(0, 163, 224, .3);
+            animation: orbGlow 3s ease-in-out infinite;
+        }
+
+        @keyframes orbGlow {
+
+            0%,
+            100% {
+                box-shadow: 0 0 30px rgba(0, 163, 224, .25)
+            }
+
+            50% {
+                box-shadow: 0 0 60px rgba(0, 163, 224, .5)
+            }
+        }
+
+        .welcome h1 {
+            font-size: 24px;
+            font-weight: 700;
+        }
+
+        .welcome p {
+            font-size: 14px;
+            color: var(--text-muted);
+            max-width: 480px;
+            line-height: 1.7;
+        }
+
+        .suggestions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            justify-content: center;
+            margin-top: 8px;
+        }
+
+        .suggestion-chip {
+            padding: 8px 14px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 500;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: all .2s;
+        }
+
+        .suggestion-chip:hover {
+            border-color: var(--primary);
+            color: var(--primary);
+            background: rgba(0, 163, 224, .08);
+        }
+
+        /* ─── Messages ───────────────────────────────────────────────── */
+        .msg-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            animation: slideUp .3s ease;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(12px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .msg-group.user {
+            flex-direction: row-reverse;
+        }
+
+        .avatar {
+            width: 34px;
+            height: 34px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            flex-shrink: 0;
+        }
+
+        .avatar.user {
+            background: linear-gradient(135deg, var(--primary-dark), var(--primary));
+        }
+
+        .avatar.ai {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+        }
+
+        .msg-body {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            max-width: 75%;
+        }
+
+        .msg-group.user .msg-body {
+            align-items: flex-end;
+        }
+
+        .msg-bubble {
+            padding: 12px 16px;
+            border-radius: var(--radius-lg);
+            font-size: 14px;
+            line-height: 1.6;
+            word-break: break-word;
+        }
+
+        .msg-group.user .msg-bubble {
+            background: var(--bg-user);
+            color: #fff;
+            border-bottom-right-radius: 4px;
+        }
+
+        .msg-group.ai .msg-bubble {
+            background: var(--bg-ai);
+            border: 1px solid var(--border);
+            border-bottom-left-radius: 4px;
+        }
+
+        .msg-meta {
+            font-size: 11px;
+            color: var(--text-subtle);
+            padding: 0 4px;
+        }
+
+        /* Actions list */
+        .actions-list {
+            background: rgba(0, 163, 224, .06);
+            border: 1px solid rgba(0, 163, 224, .2);
+            border-radius: 10px;
+            padding: 10px 12px;
+            margin-top: 8px;
+            font-size: 12px;
+        }
+
+        .actions-list-title {
+            font-weight: 600;
+            color: var(--primary);
+            margin-bottom: 6px;
+        }
+
+        .action-item {
+            color: var(--success);
+            padding: 2px 0;
+        }
+
+        .action-item.fail {
+            color: var(--danger);
+        }
+
+        /* Screenshot */
+        .screenshot-preview {
+            margin-top: 10px;
+            border-radius: 10px;
+            overflow: hidden;
+            border: 1px solid var(--border);
+            max-width: 100%;
+        }
+
+        .screenshot-preview img {
+            width: 100%;
+            display: block;
+        }
+
+        .screenshot-label {
+            font-size: 11px;
+            color: var(--text-muted);
+            padding: 6px 10px;
+            background: var(--bg-card);
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        /* Typing indicator */
+        .typing-indicator .msg-bubble {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            padding: 14px 18px;
+        }
+
+        .typing-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: var(--primary);
+            animation: typingBounce 1.2s ease-in-out infinite;
+        }
+
+        .typing-dot:nth-child(2) {
+            animation-delay: .2s;
+        }
+
+        .typing-dot:nth-child(3) {
+            animation-delay: .4s;
+        }
+
+        @keyframes typingBounce {
+
+            0%,
+            80%,
+            100% {
+                transform: scale(1)
+            }
+
+            40% {
+                transform: scale(1.4)
+            }
+        }
+
+        /* ─── Setup Banner ───────────────────────────────────────────── */
+        #setupBanner {
+            margin: 0 0 12px;
+            background: rgba(210, 153, 34, .1);
+            border: 1px solid rgba(210, 153, 34, .4);
+            border-radius: var(--radius);
+            padding: 14px 16px;
+            font-size: 13px;
+            display: none;
+        }
+
+        #setupBanner.show {
+            display: block;
+        }
+
+        #setupBanner a {
+            color: var(--warning);
+            font-weight: 600;
+        }
+
+        /* ─── Input Bar ──────────────────────────────────────────────── */
+        .input-area {
+            padding: 12px 0 20px;
+            border-top: 1px solid var(--border);
+        }
+
+        .input-row {
+            display: flex;
+            align-items: flex-end;
+            gap: 8px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: 8px 8px 8px 16px;
+            transition: border-color .2s;
+        }
+
+        .input-row:focus-within {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(0, 163, 224, .15);
+        }
+
+        #msgInput {
+            flex: 1;
+            background: transparent;
+            border: none;
+            outline: none;
+            color: var(--text);
+            font-family: inherit;
+            font-size: 14px;
+            line-height: 1.5;
+            resize: none;
+            max-height: 140px;
+            min-height: 22px;
+        }
+
+        #msgInput::placeholder {
+            color: var(--text-subtle);
+        }
+
+        .input-actions {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex-shrink: 0;
+        }
+
+        .btn-send {
+            width: 38px;
+            height: 38px;
+            border-radius: 10px;
+            background: linear-gradient(135deg, var(--primary-dark), var(--primary));
+            border: none;
+            color: #fff;
+            cursor: pointer;
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all .2s;
+            flex-shrink: 0;
+        }
+
+        .btn-send:hover:not(:disabled) {
+            transform: scale(1.06);
+            box-shadow: 0 4px 15px rgba(0, 163, 224, .4);
+        }
+
+        .btn-send:disabled {
+            opacity: .5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-close-session {
+            padding: 0 12px;
+            height: 38px;
+            border-radius: 10px;
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            transition: all .2s;
+            white-space: nowrap;
+        }
+
+        .btn-close-session:hover {
+            border-color: var(--danger);
+            color: var(--danger);
+        }
+
+        .input-hint {
+            font-size: 11px;
+            color: var(--text-subtle);
+            text-align: center;
+            margin-top: 8px;
+        }
+
+        .input-hint kbd {
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 1px 5px;
+            font-size: 10px;
+        }
+
+        /* ─── Scrollbar global ───────────────────────────────────────── */
+        @keyframes fadeIn {
+            from {
+                opacity: 0
+            }
+
+            to {
+                opacity: 1
+            }
+        }
+
+        /* ─── Settings Panel ─────────────────────────────────────────── */
+        .settings-wrap {
+            position: relative;
+        }
+
+        .settings-panel {
+            display: none;
+            position: absolute;
+            top: calc(100% + 8px);
+            right: 0;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 16px;
+            width: 320px;
+            z-index: 100;
+            box-shadow: var(--shadow);
+            animation: fadeIn .2s ease;
+        }
+
+        .settings-panel.open {
+            display: block;
+        }
+
+        .settings-panel h3 {
+            font-size: 13px;
+            font-weight: 600;
+            margin-bottom: 10px;
+            color: var(--text);
+        }
+
+        .settings-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+
+        .settings-row label {
+            font-size: 12px;
+            color: var(--text-muted);
+            min-width: 60px;
+        }
+
+        .mode-toggle {
+            display: flex;
+            background: var(--bg-input);
+            border-radius: 8px;
+            padding: 3px;
+            gap: 3px;
+        }
+
+        .mode-btn {
+            padding: 4px 12px;
+            border-radius: 6px;
+            border: none;
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            background: transparent;
+            color: var(--text-muted);
+            transition: all .15s;
+        }
+
+        .mode-btn.active {
+            background: var(--primary);
+            color: #fff;
+        }
+
+        .api-key-input {
+            width: 100%;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 8px 10px;
+            font-size: 12px;
+            color: var(--text);
+            font-family: monospace;
+            outline: none;
+            transition: border-color .2s;
+            margin-bottom: 8px;
+        }
+
+        .api-key-input:focus {
+            border-color: var(--primary);
+        }
+
+        .settings-save {
+            width: 100%;
+            padding: 7px;
+            border-radius: 8px;
+            background: linear-gradient(135deg, var(--primary-dark), var(--primary));
+            border: none;
+            color: #fff;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: opacity .2s;
+        }
+
+        .settings-save:hover {
+            opacity: .9;
+        }
+
+        .settings-note {
+            font-size: 11px;
+            color: var(--text-subtle);
+            margin-top: 8px;
+            line-height: 1.5;
+        }
+
+        .settings-note a {
+            color: var(--accent);
+        }
+    </style>
+</head>
+
+<body>
+    <div class="app">
+
+        <!-- Topbar -->
+        <header class="topbar">
+            <div class="brand">
+                <div class="brand-icon">🤖</div>
+                <div>
+                    <div class="brand-name">Smart IMS AI</div>
+                    <div class="brand-sub">Powered by Gemini · Playwright MCP</div>
+                </div>
+            </div>
+            <div class="topbar-actions">
+                <div class="pill offline" id="statusPill">
+                    <div class="pill-dot"></div>
+                    <span id="statusText">Checking...</span>
+                </div>
+                <!-- Settings -->
+                <div class="settings-wrap">
+                    <button class="btn-icon" id="btnSettings" title="AI Settings">⚙️</button>
+                    <div class="settings-panel" id="settingsPanel">
+                        <h3>⚙️ AI Mode</h3>
+                        <div class="settings-row">
+                            <label>Mode</label>
+                            <div class="mode-toggle">
+                                <button class="mode-btn active" id="modeOllama" onclick="setMode('ollama')">🦙
+                                    Smart IMS AI</button>
+                                <button class="mode-btn" id="modeGemini" onclick="setMode('gemini')">✨ Gemini</button>
+                            </div>
+                        </div>
+                        <div id="geminiKeySection" style="display:none">
+                            <input class="api-key-input" type="password" id="geminiKeyInput"
+                                placeholder="Paste Gemini API key here..." />
+                            <button class="settings-save" onclick="saveGeminiKey()">Save Key</button>
+                            <p class="settings-note">
+                                Get a free key at <a href="https://aistudio.google.com/apikey"
+                                    target="_blank">aistudio.google.com/apikey</a>.
+                                Your key is stored locally in this browser only.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                <button class="btn-icon" id="btnClearChat" title="Clear chat">🗑️</button>
+                <a href="index.html" class="back-link">← Back</a>
+            </div>
+        </header>
+
+        <!-- Setup Banner (shown when Smart IMS AI offline) -->
+        <div id="setupBanner">
+            ⚠️ <strong>AI service is warming up.</strong>
+            The browser agent is initializing. Please wait a moment before sending your first message.
+        </div>
+
+        <!-- Chat window -->
+        <main class="chat-window" id="chatWindow">
+            <!-- Welcome screen -->
+            <div class="welcome" id="welcomeScreen">
+                <div class="welcome-orb">🤖</div>
+                <h1>Smart IMS AI</h1>
+                <p>
+                    Tell me what to do in the browser — in plain English.<br>
+                    I'll use <strong>Gemini AI + Playwright MCP</strong> to understand and automate it.
+                </p>
+                <div class="suggestions">
+                    <div class="suggestion-chip" onclick="useSuggestion(this)">Open google.com and take a screenshot
+                    </div>
+                    <div class="suggestion-chip" onclick="useSuggestion(this)">Navigate to saucedemo.com and login with
+                        username 'standard_user' and password 'secret_sauce'</div>
+                    <div class="suggestion-chip" onclick="useSuggestion(this)">Go to wikipedia.org and search for
+                        Playwright automation</div>
+                    <div class="suggestion-chip" onclick="useSuggestion(this)">Open github.com and take a screenshot
+                    </div>
+                    <div class="suggestion-chip" onclick="useSuggestion(this)">What can you do?</div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Input bar -->
+        <div class="input-area">
+            <div class="input-row">
+                <textarea id="msgInput"
+                    placeholder="Tell me what to automate... (e.g. 'Open google.com and search for ValGenesis')"
+                    rows="1" aria-label="Chat message input"></textarea>
+                <div class="input-actions">
+                    <button class="btn-close-session" id="btnCloseSession" title="Close browser session">
+                        🔒 Close Browser
+                    </button>
+                    <button class="btn-send" id="btnSend" aria-label="Send message">
+                        ➤
+                    </button>
+                </div>
+            </div>
+            <div class="input-hint">
+                Press <kbd>Enter</kbd> to send · <kbd>Shift+Enter</kbd> for new line
+            </div>
+        </div>
+
+    </div>
+
+    <script src="ollama-chat.js" defer></script>
+</body>
+
+</html>

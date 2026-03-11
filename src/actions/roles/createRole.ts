@@ -2,7 +2,7 @@ import { Page } from 'playwright';
 
 import { automationEvents } from '../../core/browser';
 
-import { waitForPostback, waitForOverlayGone } from '../../core/navigation';
+import { waitForPostback, waitForOverlayGone, waitForIframeLoaderGone } from '../../core/navigation';
 
 import { AdministrationPage } from '../../pages/administrationPage';
 
@@ -56,10 +56,7 @@ async function configureRolePermissions(
   await page.waitForTimeout(1000);
 
   await frame.locator('#btnSave').click();
-
-  await page.waitForTimeout(1000);
-
-  await page.waitForLoadState('domcontentloaded');
+  await waitForOverlayGone(page, 15000);
 
   const successMessage = frame.locator('#val1_lblCM', { hasText: 'Role Profile has been Updated' })
 
@@ -139,9 +136,8 @@ export async function createRole(
 
 
 
-      // ===================== Role Creation =====================
-
-      await page.waitForTimeout(3000);
+      // Wait for iframe loader to disappear and form to be ready
+      await waitForIframeLoaderGone(page, 15000);
       await page.mouse.move(1, 1);
 
       await frame.locator('#ddlRoleType')
@@ -165,8 +161,7 @@ export async function createRole(
 
 
       await frame.locator('#btnSubmit').click();
-
-      await page.waitForLoadState('load');
+      await waitForOverlayGone(page, 15000);
 
 
 
