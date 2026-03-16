@@ -195,6 +195,62 @@
             color: var(--primary);
         }
 
+        /* Navigation Links */
+        .nav-links {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .nav-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            color: var(--text-muted);
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: 500;
+            font-size: 12px;
+            transition: all 0.2s;
+            background: transparent;
+            border: 1px solid transparent;
+        }
+
+        .nav-link:hover {
+            color: var(--text);
+            background: rgba(255, 255, 255, 0.05);
+            border-color: var(--border);
+        }
+
+        .nav-link.active {
+            color: white;
+            background: rgba(255, 255, 255, 0.1);
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+
+        .nav-link.primary {
+            background: linear-gradient(135deg, #00A3E0 0%, #0052A5 100%);
+            color: white;
+            border: none;
+        }
+
+        .nav-link.primary:hover {
+            transform: scale(1.05);
+            box-shadow: 0 4px 15px rgba(0, 163, 224, 0.4);
+        }
+
+        .nav-link.secondary {
+            background: linear-gradient(135deg, #1a6b3c 0%, #2ea043 100%);
+            color: white;
+            border: none;
+        }
+
+        .nav-link.secondary:hover {
+            transform: scale(1.05);
+            box-shadow: 0 4px 15px rgba(46, 160, 67, 0.4);
+        }
+
         /* ─── Chat Window ────────────────────────────────────────────── */
         .chat-window {
             display: flex;
@@ -763,7 +819,12 @@
                     </div>
                 </div>
                 <button class="btn-icon" id="btnClearChat" title="Clear chat">🗑️</button>
-                <a href="index.html" class="back-link">← Back</a>
+                <nav class="nav-links">
+                    <a href="index.html" class="nav-link">🏠 Home</a>
+                    <a href="dashboard.html" class="nav-link">📊 Dashboard</a>
+                    <a href="ai-automation.html" class="nav-link primary">🤖 AI Automation</a>
+                    <a href="ollama-chat.html" class="nav-link secondary active">✨ Smart IMS AI Chat</a>
+                </nav>
             </div>
         </header>
 

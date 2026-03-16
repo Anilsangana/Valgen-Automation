@@ -53,38 +53,12 @@
         <span class="status-dot"></span>
         <span>System Active</span>
       </div>
-      <a href="ai-automation.html" style="
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        padding: 8px 16px;
-        background: linear-gradient(135deg, #00A3E0 0%, #0052A5 100%);
-        color: white;
-        text-decoration: none;
-        border-radius: 6px;
-        font-weight: 600;
-        font-size: 13px;
-        margin-left: 15px;
-        transition: transform 0.2s;
-      " onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
-        🤖 AI Automation
-      </a>
-      <a href="ollama-chat.html" style="
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        padding: 8px 16px;
-        background: linear-gradient(135deg, #1a6b3c 0%, #2ea043 100%);
-        color: white;
-        text-decoration: none;
-        border-radius: 6px;
-        font-weight: 600;
-        font-size: 13px;
-        margin-left: 8px;
-        transition: transform 0.2s;
-      " onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
-        ✨ Smart IMS AI Chat
-      </a>
+      <nav class="nav-links">
+        <a href="index.html" class="nav-link active">🏠 Home</a>
+        <a href="dashboard.html" class="nav-link">📊 Dashboard</a>
+        <a href="ai-automation.html" class="nav-link primary">🤖 AI Automation</a>
+        <a href="ollama-chat.html" class="nav-link secondary">✨ Smart IMS AI Chat</a>
+      </nav>
     </div>
   </header>
 
@@ -195,6 +169,9 @@
       <div id="resultsList"></div>
     </section>
 
+    <!-- React Island (isolated; does not affect existing UI) -->
+    <div id="react-root" style="margin-top: 24px;"></div>
+
     <!-- PDF Audit Report Section (Hidden by default) -->
     <section class="card" id="pdfSection" style="display:none;">
       <h2>📄 Audit Report</h2>
@@ -208,6 +185,14 @@
     <div>© 2026 | ValGenesis Admin Automation | Secure Execution Framework</div>
     <div style="font-size: 11px; margin-top: 8px; opacity: 0.7;">Last Updated: January 2026</div>
   </footer>
+
+  <!-- React (loaded for isolated "islands"; existing JS remains unchanged) -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="react-island.js" defer></script>
+
+  <!-- Data Persistence -->
+  <script src="dataPersistence.js"></script>
 
   <!-- Application Script -->
   <script src="app.js" defer></script>

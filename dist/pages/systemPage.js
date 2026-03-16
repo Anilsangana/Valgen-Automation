@@ -76,5 +76,16 @@ class SystemPage {
         ]);
         await this.page.waitForTimeout(800);
     }
+    /**
+     * Navigates to System → Workflow.
+     */
+    async navigateToWorkflow() {
+        await this.systemButton.click();
+        await this.page.waitForLoadState('load');
+        // Find and click Workflow menu item
+        const workflowButton = this.page.getByText('Workflow');
+        await workflowButton.click();
+        await this.page.waitForTimeout(800);
+    }
 }
 exports.SystemPage = SystemPage;

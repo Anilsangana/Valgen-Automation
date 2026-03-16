@@ -13,12 +13,14 @@ exports.runCreateCategories = runCreateCategories;
 exports.runCreateGroups = runCreateGroups;
 exports.runCreateSubCategories = runCreateSubCategories;
 exports.runCreateFunctionalRoles = runCreateFunctionalRoles;
+exports.runCompleteWorkflowAutomation = runCompleteWorkflowAutomation;
 const path_1 = __importDefault(require("path"));
 const fs_1 = __importDefault(require("fs"));
 const browser_1 = require("../core/browser");
 const login_1 = require("../core/login");
 const csvReader_1 = require("../utils/csvReader");
 const createRole_1 = require("../actions/roles/createRole");
+const completeWorkflow_1 = require("../actions/workflow/completeWorkflow");
 const createUser_1 = require("../actions/users/createUser");
 const deactivateUsers_1 = require("../actions/users/deactivateUsers");
 const assignRole_1 = require("../actions/assignRole");
@@ -431,6 +433,43 @@ async function runCreateFunctionalRoles(baseUrl, username, password, functionalR
         throw err;
     }
     finally {
+        await browser.close();
+    }
+}
+/**
+ * Runs the complete workflow automation including:
+ * - Login
+ * - Navigate to System → Workflow
+ * - Fill workflow form
+ * - Create "CSV DEMO GROUP"
+ * - Add group to selected groups and approver users
+ */
+async function runCompleteWorkflowAutomation(baseUrl, username, password, functionalRoleName, approvalPeriodDays, frequencyDays, serialParallel) {
+    const { browser, context } = await (0, browser_1.launchBrowser)();
+    const page = await (0, browser_1.newPage)(context);
+    const startTime = Date.now();
+    try {
+        browser_1.automationEvents.emit('log', '🚀 Starting Complete Workflow Automation');
+        const workflowData = {
+            baseUrl,
+            username,
+            password,
+            functionalRoleName,
+            approvalPeriodDays,
+            frequencyDays,
+            serialParallel
+        };
+        const result = await (0, completeWorkflow_1.runCompleteWorkflow)(page, workflowData);
+        const duration = Date.now() - startTime;
+        browser_1.automationEvents.emit('log', `⏱️ Workflow completed in ${(duration / 1000).toFixed(2)}s`);
+        return result;
+    }
+    catch (err) {
+        browser_1.automationEvents.emit('error', `Workflow automation failed: ${String(err)}`);
+        throw err;
+    }
+    finally {
+        await context.close();
         await browser.close();
     }
 }
