@@ -6,6 +6,7 @@ import { createSubCategory } from '../createSubCategory';
 import { createFunctionalRole } from '../createFunctionalRole';
 import { createDepartment } from '../createDepartment';
 import { createGroup } from '../createGroup';
+import { createWorkflow } from '../createWorkflow';
 import * as http from 'http';
 import * as fs from 'fs';
 import * as os from 'os';
@@ -88,6 +89,7 @@ PROCEDURES (Prefer these for maximum speed):
   - create_functional_role(roles: Array<{name, prefix, description}>)
   - create_department(departments: Array<{name, description}>)
   - create_group(groups: Array<{name, groupType, description, allUsers: boolean}>)
+  - create_workflow(workflows: Array<{name, description?, applicableTo?: ["Authoring"|"Exception"|"Execution"|"Project"|"Scheduler"|"System Manager"|"Assessment"], reviewRequired?: boolean, reviewGroups?: string[], reviewSteps?: [{functionalRole?, periodDays?, frequencyDays?, serialParallel?:"Serial"|"Parallel"}], approvalGroups?: string[], approvalSteps?: [{functionalRole?, periodDays?, frequencyDays?, serialParallel?:"Serial"|"Parallel"}]}>)
 LOGIN/NAVIGATE: Always login first if not at dashboard.
 UNIQUENESS: For any name/prefix, USE the current timestamp + random 3 digits (e.g., 'Auditor_1741582231492').
   - CRITICAL: Never copy the example value exactly. Generate a NEW value for every run.
@@ -204,6 +206,9 @@ async function parseAndExecuteSmartCommand(page: Page, command: string, username
                         break;
                     case 'create_group':
                         procResult = await createGroup(page, act.args.groups);
+                        break;
+                    case 'create_workflow':
+                        procResult = await createWorkflow(page, act.args.workflows);
                         break;
                     default:
                         throw new Error(`Unknown procedure: ${act.procedure}`);

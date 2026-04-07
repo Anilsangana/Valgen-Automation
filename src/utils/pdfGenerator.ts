@@ -17,6 +17,7 @@ interface AuditReportData {
         subCategory?: any[];
         group?: any[];
         functionalRole?: any[];
+        workflow?: any;
     };
     screenshots?: Array<{ path: string; caption: string; timestamp: string }>;
     summary?: string;
@@ -261,6 +262,22 @@ export async function generateAuditPDF(data: AuditReportData): Promise<string> {
                         { label: 'Prefix', value: item.prefix || 'N/A' },
                         { label: 'Status', value: item.status || 'N/A' },
                         { label: 'Created As', value: item.createdAs || item.functionalRole || 'N/A' },
+                        { label: 'Description', value: item.description || 'N/A' }
+                    ];
+                    if (item.timestamp) {
+                        fields.push({ label: 'Timestamp', value: formatTimestamp(item.timestamp) });
+                    }
+                    return fields;
+                });
+            }
+
+            // User Creation Results
+            if (data.results.workflow && data.results.workflow.length > 0) {
+                addEnterpriseResultSection(doc, 'WORKFLOW CREATION', data.results.workflow, (item: any) => {
+                    const fields: Array<{ label: string; value: string }> = [
+                        { label: 'Workflow Name', value: item.workflow || item.name || 'N/A' },
+                        { label: 'Status', value: item.status || 'N/A' },
+                        { label: 'Review Required', value: item.reviewRequired ? 'Yes' : 'No' },
                         { label: 'Description', value: item.description || 'N/A' }
                     ];
                     if (item.timestamp) {

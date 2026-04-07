@@ -13,14 +13,13 @@ exports.runCreateCategories = runCreateCategories;
 exports.runCreateGroups = runCreateGroups;
 exports.runCreateSubCategories = runCreateSubCategories;
 exports.runCreateFunctionalRoles = runCreateFunctionalRoles;
-exports.runCompleteWorkflowAutomation = runCompleteWorkflowAutomation;
+exports.runWorkflowAutomation = runWorkflowAutomation;
 const path_1 = __importDefault(require("path"));
 const fs_1 = __importDefault(require("fs"));
 const browser_1 = require("../core/browser");
 const login_1 = require("../core/login");
 const csvReader_1 = require("../utils/csvReader");
 const createRole_1 = require("../actions/roles/createRole");
-const completeWorkflow_1 = require("../actions/workflow/completeWorkflow");
 const createUser_1 = require("../actions/users/createUser");
 const deactivateUsers_1 = require("../actions/users/deactivateUsers");
 const assignRole_1 = require("../actions/assignRole");
@@ -29,6 +28,7 @@ const createCategory_1 = require("../actions/createCategory");
 const createSubCategory_1 = require("../actions/createSubCategory");
 const createGroup_1 = require("../actions/createGroup");
 const createFunctionalRole_1 = require("../actions/createFunctionalRole");
+const completeWorkflow_1 = require("../actions/workflow/completeWorkflow");
 // ===================== CREATE ROLES =====================
 async function runCreateRoles(baseUrl, username, password, roleName, duplicateStrategy = 'skip', permissions) {
     // Backend validation
@@ -436,40 +436,52 @@ async function runCreateFunctionalRoles(baseUrl, username, password, functionalR
         await browser.close();
     }
 }
-/**
- * Runs the complete workflow automation including:
- * - Login
- * - Navigate to System → Workflow
- * - Fill workflow form
- * - Create "CSV DEMO GROUP"
- * - Add group to selected groups and approver users
- */
-async function runCompleteWorkflowAutomation(baseUrl, username, password, functionalRoleName, approvalPeriodDays, frequencyDays, serialParallel) {
-    const { browser, context } = await (0, browser_1.launchBrowser)();
+// ===================== COMPLETE WORKFLOW =====================
+async function runWorkflowAutomation(baseUrl, username, password, functionalRoleName, approvalPeriodDays, frequencyDays, serialParallel) {
+    // Backend validation
+    if (!baseUrl || !username || !password || !functionalRoleName) {
+        throw new Error('Missing required fields: baseUrl, username, password, functionalRoleName');
+    }
+    if (functionalRoleName.length < 2 || functionalRoleName.length > 100) {
+        throw new Error('Functional role name must be between 2 and 100 characters');
+    }
+    const { browser, context } = await (0, browser_1.launchBrowser)({ headless: false });
     const page = await (0, browser_1.newPage)(context);
-    const startTime = Date.now();
+    browser_1.automationEvents.emit('log', '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    browser_1.automationEvents.emit('log', 'Starting Workflow Automation');
+    browser_1.automationEvents.emit('log', '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     try {
-        browser_1.automationEvents.emit('log', '🚀 Starting Complete Workflow Automation');
-        const workflowData = {
+        const input = {
             baseUrl,
             username,
             password,
             functionalRoleName,
             approvalPeriodDays,
             frequencyDays,
-            serialParallel
+            serialParallel: serialParallel || 'Serial',
+            generateData: true
         };
-        const result = await (0, completeWorkflow_1.runCompleteWorkflow)(page, workflowData);
-        const duration = Date.now() - startTime;
-        browser_1.automationEvents.emit('log', `⏱️ Workflow completed in ${(duration / 1000).toFixed(2)}s`);
+        browser_1.automationEvents.emit('log', `Creating workflow with functional role: ${functionalRoleName}`);
+        const result = await (0, completeWorkflow_1.runCompleteWorkflow)(page, input);
+        if (result.success) {
+            browser_1.automationEvents.emit('log', '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+            browser_1.automationEvents.emit('log', '✅ Workflow automation completed successfully!');
+            browser_1.automationEvents.emit('log', '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        }
+        else {
+            browser_1.automationEvents.emit('log', '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+            browser_1.automationEvents.emit('error', '❌ Workflow automation completed with failures');
+            browser_1.automationEvents.emit('log', '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        }
         return result;
     }
     catch (err) {
-        browser_1.automationEvents.emit('error', `Workflow automation failed: ${String(err)}`);
+        browser_1.automationEvents.emit('log', '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        browser_1.automationEvents.emit('error', `❌ Workflow automation failed: ${String(err)}`);
+        browser_1.automationEvents.emit('log', '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
         throw err;
     }
     finally {
-        await context.close();
         await browser.close();
     }
 }

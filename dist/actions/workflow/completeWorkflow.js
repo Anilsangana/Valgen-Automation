@@ -41,7 +41,7 @@ async function runCompleteWorkflow(page, input) {
         // Step 2: Navigate to System → Workflow
         results.steps.push({ step: 'Navigate to Workflow', status: 'in_progress' });
         browser_1.automationEvents.emit('log', '📍 Navigating to System → Workflow');
-        await systemPage.navigateToWorkflow();
+        await systemPage.navigateToWorkflowCreate();
         await (0, navigation_1.waitForPostback)(page, 15000);
         await (0, navigation_1.waitForOverlayGone)(page);
         results.steps[results.steps.length - 1].status = 'success';
@@ -49,78 +49,190 @@ async function runCompleteWorkflow(page, input) {
         // Step 3: Fill Workflow Form
         results.steps.push({ step: 'Fill Workflow Form', status: 'in_progress' });
         browser_1.automationEvents.emit('log', '📝 Filling workflow form');
+        const frame = page.frameLocator('iframe[name="framecontent"]');
+        await (0, navigation_1.waitForIframeLoaderGone)(page, 15000);
         // Wait for form to be ready
-        await page.waitForSelector('#txtWName', { state: 'visible', timeout: 10000 });
-        // Fill Workflow Name
-        await page.fill('#txtWName', `TestWorkflow_${Date.now()}`);
-        browser_1.automationEvents.emit('log', `📋 Workflow Name set to: TestWorkflow_${Date.now()}`);
-        // Fill Workflow ID (auto-generated)
-        const workflowId = page.locator('#txtWID');
-        await workflowId.waitFor({ state: 'visible', timeout: 5000 });
-        const currentWorkflowId = await workflowId.inputValue();
-        browser_1.automationEvents.emit('log', `� Workflow ID: ${currentWorkflowId}`);
-        // Set Applicable To - Select All
-        await page.check('#chkAll');
-        browser_1.automationEvents.emit('log', '📋 Set Applicable To: Select All');
-        // Set Review Required to No
-        await page.check('#rbtNo');
-        browser_1.automationEvents.emit('log', '� Set Review Required: No');
-        // Fill Description
-        await page.fill('#txtDescription', `Auto-generated workflow for testing - ${new Date().toISOString()}`);
-        browser_1.automationEvents.emit('log', '� Description added');
+        await frame.locator('body').waitFor({ state: 'visible', timeout: 10000 });
+        // Fill Functional Role (user will provide from UI)
+        await frame.locator('#ddlFunctionalRole').waitFor({ state: 'visible', timeout: 10000 });
+        await frame.locator('#ddlFunctionalRole').selectOption({ label: input.functionalRoleName });
+        browser_1.automationEvents.emit('log', `📋 Selected Functional Role: ${input.functionalRoleName}`);
+        // Fill Approval Period in Days (user will provide from UI)
+        if (input.approvalPeriodDays) {
+            await frame.locator('#txtApprovalPeriodDays').fill(input.approvalPeriodDays.toString());
+            browser_1.automationEvents.emit('log', `📅 Set Approval Period: ${input.approvalPeriodDays} days`);
+        }
+        // Fill Frequency in Days (user will provide from UI)
+        if (input.frequencyDays) {
+            await frame.locator('#txtFrequencyDays').fill(input.frequencyDays.toString());
+            browser_1.automationEvents.emit('log', `🔄 Set Frequency: ${input.frequencyDays} days`);
+        }
+        // Select Serial/Parallel (default to Serial)
+        const serialParallel = input.serialParallel || 'Serial';
+        await frame.locator('#ddlSerialParallel').selectOption({ label: serialParallel });
+        browser_1.automationEvents.emit('log', `⚙️ Set Serial/Parallel: ${serialParallel}`);
+        // Select "No" for Review Required
+        await frame.locator('#ddlReviewRequired').selectOption({ label: 'No' });
+        browser_1.automationEvents.emit('log', '📝 Set Review Required: No');
+        // Select "No" for Applicable To
+        await frame.locator('#ddlApplicableTo').selectOption({ label: 'No' });
+        browser_1.automationEvents.emit('log', '📝 Set Applicable To: No');
         results.steps[results.steps.length - 1].status = 'success';
         browser_1.automationEvents.emit('log', '✅ Workflow form filled successfully');
         // Step 4: Submit Workflow
         results.steps.push({ step: 'Submit Workflow', status: 'in_progress' });
         browser_1.automationEvents.emit('log', '💾 Submitting workflow form');
-        await page.locator('#btnSubmit').click();
+        await frame.locator('#btnSubmit').click();
         await (0, navigation_1.waitForPostback)(page, 15000);
         await (0, navigation_1.waitForOverlayGone)(page);
-        // Check for success message and complete
+        // Check for success message
+        const successPopup = frame.locator('#btnMessageOk');
+        await successPopup.waitFor({ state: 'visible', timeout: 10000 });
+        results.steps[results.steps.length - 1].status = 'success';
+        browser_1.automationEvents.emit('log', '✅ Workflow submitted successfully');
+        // Close success popup
+        await frame.locator('#btnMessageOk').click();
+        await page.waitForTimeout(2000);
+        // Step 5: Navigate to System → Create → Group
+        results.steps.push({ step: 'Navigate to Group Creation', status: 'in_progress' });
+        browser_1.automationEvents.emit('log', '👥 Navigating to System → Create → Group');
+        await systemPage.navigateToGroupCreate();
+        await (0, navigation_1.waitForPostback)(page, 15000);
+        await (0, navigation_1.waitForOverlayGone)(page);
+        results.steps[results.steps.length - 1].status = 'success';
+        browser_1.automationEvents.emit('log', '✅ Navigated to Group Creation page');
+        // Step 6: Create "CSV DEMO GROUP"
+        results.steps.push({ step: 'Create CSV DEMO GROUP', status: 'in_progress' });
+        browser_1.automationEvents.emit('log', '👥 Creating "CSV DEMO GROUP"');
+        const groupFrame = page.frameLocator('iframe[name="framecontent"]');
+        await (0, navigation_1.waitForIframeLoaderGone)(page, 15000);
+        // Wait for form to be ready
+        await groupFrame.locator('body').waitFor({ state: 'visible', timeout: 10000 });
+        // Fill Group Name
+        await groupFrame.locator('#txtboxGroupName').fill('CSV DEMO GROUP');
+        browser_1.automationEvents.emit('log', '📝 Group name set to: CSV DEMO GROUP');
+        // Select Group Type (Review and Approval)
+        await groupFrame.locator('#ddlGroupType').selectOption({ label: 'Review and Approval' });
+        browser_1.automationEvents.emit('log', '📝 Group type set to: Review and Approval');
+        // Add Description
+        await groupFrame.locator('#txtboxGroupDescription').fill('Demo group for CSV workflow testing');
+        browser_1.automationEvents.emit('log', '📝 Group description added');
+        // Click "Select All" in Available Users
+        browser_1.automationEvents.emit('log', '👥 Selecting all available users');
+        await groupFrame.locator('text=Select All').first().click();
+        await page.waitForTimeout(2000);
+        // Submit Group Creation
+        await groupFrame.locator('#btnSubmit').click();
+        await (0, navigation_1.waitForPostback)(page, 15000);
+        await (0, navigation_1.waitForOverlayGone)(page);
+        // Check for success
+        const groupSuccessPopup = groupFrame.locator('#btnMessageOk');
+        await groupSuccessPopup.waitFor({ state: 'visible', timeout: 10000 });
+        results.steps[results.steps.length - 1].status = 'success';
+        browser_1.automationEvents.emit('log', '✅ "CSV DEMO GROUP" created successfully');
+        // Save group to database
+        try {
+            const groupData = {
+                name: 'CSV DEMO GROUP',
+                type: 'Review and Approval',
+                description: 'Demo group for CSV workflow testing',
+                selectAllUsers: true,
+                createdAt: new Date().toISOString(),
+                createdBy: 'automation'
+            };
+            const groupId = await dataService_1.DataService.saveEntity('group', 'CSV DEMO GROUP', groupData);
+            if (results.createdEntities) {
+                results.createdEntities.push({ type: 'group', id: groupId, name: 'CSV DEMO GROUP' });
+            }
+            browser_1.automationEvents.emit('log', `💾 Group saved to database with ID: ${groupId}`);
+        }
+        catch (dbErr) {
+            browser_1.automationEvents.emit('error', `Failed to save group to database: ${String(dbErr)}`);
+        }
+        // Close success popup
+        await groupFrame.locator('#btnMessageOk').click();
+        await page.waitForTimeout(2000);
+        // Step 7: Navigate to Workflow again to add group to selected groups
+        results.steps.push({ step: 'Add Group to Selected Groups', status: 'in_progress' });
+        browser_1.automationEvents.emit('log', '🔄 Navigating back to Workflow to add group');
+        await systemPage.navigateToWorkflowCreate();
+        await (0, navigation_1.waitForPostback)(page, 15000);
+        await (0, navigation_1.waitForOverlayGone)(page);
+        const workflowFrame = page.frameLocator('iframe[name="framecontent"]');
+        await (0, navigation_1.waitForIframeLoaderGone)(page, 15000);
+        // Click "Available Groups" to open group selection
+        await workflowFrame.locator('#btnAvailableGroups').click();
+        await page.waitForTimeout(2000);
+        // Select "CSV DEMO GROUP" from available groups
+        await workflowFrame.locator('text=CSV DEMO GROUP').first().click();
+        await page.waitForTimeout(1000);
+        // Click "Add" to move to selected groups
+        await workflowFrame.locator('#btnAdd').click();
+        await page.waitForTimeout(2000);
+        results.steps[results.steps.length - 1].status = 'success';
+        browser_1.automationEvents.emit('log', '✅ "CSV DEMO GROUP" added to selected groups');
+        // Step 8: Add "CSV DEMO GROUP" to approver users
+        results.steps.push({ step: 'Add Group to Approver Users', status: 'in_progress' });
+        browser_1.automationEvents.emit('log', '👤 Adding group to approver users');
+        // Click "Available Users" to open user selection
+        await workflowFrame.locator('#btnAvailableUsers').click();
+        await page.waitForTimeout(2000);
+        // Select "CSV DEMO GROUP" from available users (it should appear as a group)
+        await workflowFrame.locator('text=CSV DEMO GROUP').first().click();
+        await page.waitForTimeout(1000);
+        // Click "Add" to move to approver users
+        await workflowFrame.locator('#btnAdd').click();
+        await page.waitForTimeout(2000);
+        results.steps[results.steps.length - 1].status = 'success';
+        browser_1.automationEvents.emit('log', '✅ "CSV DEMO GROUP" added to approver users');
+        // Step 9: Save Functional Role Data
+        results.steps.push({ step: 'Save Functional Role Data', status: 'in_progress' });
+        browser_1.automationEvents.emit('log', '💾 Saving functional role data');
+        try {
+            const functionalRoleData = {
+                name: input.functionalRoleName,
+                approvalPeriodDays: input.approvalPeriodDays,
+                frequencyDays: input.frequencyDays,
+                serialParallel: input.serialParallel || 'Serial',
+                reviewRequired: 'No',
+                applicableTo: 'No',
+                createdAt: new Date().toISOString(),
+                createdBy: 'automation'
+            };
+            const roleId = await dataService_1.DataService.saveEntity('functionalRole', input.functionalRoleName, functionalRoleData);
+            if (results.createdEntities) {
+                results.createdEntities.push({ type: 'functionalRole', id: roleId, name: input.functionalRoleName });
+            }
+            browser_1.automationEvents.emit('log', `💾 Functional role saved to database with ID: ${roleId}`);
+        }
+        catch (dbErr) {
+            browser_1.automationEvents.emit('error', `Failed to save functional role to database: ${String(dbErr)}`);
+        }
+        results.steps[results.steps.length - 1].status = 'success';
+        browser_1.automationEvents.emit('log', '✅ Functional role data saved successfully');
+        // Final success check
         results.steps.push({ step: 'Final Verification', status: 'in_progress' });
         browser_1.automationEvents.emit('log', '🔍 Performing final verification');
-        try {
-            await page.waitForSelector('#txtWName', { state: 'visible', timeout: 5000 });
-            results.steps[results.steps.length - 2].status = 'success';
+        // Check if we're still on the workflow page and form is filled correctly
+        const currentFunctionalRole = await workflowFrame.locator('#ddlFunctionalRole').inputValue();
+        const currentApprovalPeriod = await workflowFrame.locator('#txtApprovalPeriodDays').inputValue();
+        const currentFrequency = await workflowFrame.locator('#txtFrequencyDays').inputValue();
+        if (currentFunctionalRole.includes(input.functionalRoleName)) {
             results.steps[results.steps.length - 1].status = 'success';
-            browser_1.automationEvents.emit('log', '✅ Workflow submitted successfully');
+            browser_1.automationEvents.emit('log', '✅ Final verification passed - workflow completed successfully');
             results.success = true;
-            // Save workflow data to database
-            try {
-                const workflowData = {
-                    name: `TestWorkflow_${Date.now()}`,
-                    reviewRequired: 'No',
-                    applicableTo: 'All',
-                    description: `Auto-generated workflow for testing - ${new Date().toISOString()}`,
-                    functionalRole: input.functionalRoleName,
-                    approvalPeriodDays: input.approvalPeriodDays,
-                    frequencyDays: input.frequencyDays,
-                    serialParallel: input.serialParallel || 'Serial',
-                    createdAt: new Date().toISOString(),
-                    createdBy: 'automation'
-                };
-                const workflowId = await dataService_1.DataService.saveEntity('workflow', workflowData.name, workflowData);
-                results.createdEntities.push({ type: 'workflow', id: workflowId, name: workflowData.name });
-                browser_1.automationEvents.emit('log', `💾 Workflow saved to database with ID: ${workflowId}`);
-            }
-            catch (dbErr) {
-                browser_1.automationEvents.emit('error', `Failed to save workflow to database: ${String(dbErr)}`);
-            }
         }
-        catch (err) {
-            results.steps[results.steps.length - 2].status = 'failed';
+        else {
             results.steps[results.steps.length - 1].status = 'failed';
-            results.steps[results.steps.length - 1].message = String(err);
-            browser_1.automationEvents.emit('error', `❌ Workflow submission failed: ${String(err)}`);
+            results.steps[results.steps.length - 1].message = 'Verification failed - form values not matching';
+            browser_1.automationEvents.emit('error', '❌ Final verification failed');
         }
     }
     catch (error) {
         const errorStep = results.steps.find(step => step.status === 'in_progress') || results.steps[results.steps.length - 1];
-        if (errorStep) {
-            errorStep.status = 'failed';
-            errorStep.message = String(error);
-        }
-        browser_1.automationEvents.emit('error', `❌ Workflow automation failed: ${String(error)}`);
+        errorStep.status = 'failed';
+        errorStep.message = String(error);
+        browser_1.automationEvents.emit('error', `❌ Workflow failed: ${String(error)}`);
     }
     return results;
 }

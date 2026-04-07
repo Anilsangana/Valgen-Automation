@@ -37,7 +37,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       { value: "categories", label: "🗂️ Create Category" },
       { value: "subCategories", label: "📁 Create Sub Category" },
       { value: "groups", label: "👥 Create Group" },
-      { value: "functionalRole", label: "🔑 Create Functional Role" }
+      { value: "functionalRole", label: "🔑 Create Functional Role" },
+      { value: "workflow", label: "⚙️ Create Workflow" }
     ],
     advanced: [
       { value: "unified", label: "⚡ Complete Setup (Role → Dept → User → Deactivate)" }
@@ -203,6 +204,12 @@ document.addEventListener("DOMContentLoaded", async () => {
         fnRolePrefix: id.slice(0, 3).toUpperCase(),
         fnRoleDescription: `Auto-generated functional role - ${id}`
       },
+      workflow: {
+        workflowName: `AutoWF_${id}`,
+        workflowApprovalDays: 30,
+        workflowFrequencyDays: 15,
+        workflowSerialParallel: 'Serial'
+      },
       unified: {
         unifiedRoleName: `AutoRole_${id}`,
         unifiedDeptName: `AutoDept_${id}`,
@@ -268,7 +275,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (savedData.category) {
         categorySelect.value = savedData.category;
         categorySelect.dispatchEvent(new Event('change'));
-        
+
         // Wait for feature options to be populated
         setTimeout(() => {
           if (savedData.feature) {
@@ -461,7 +468,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       // Wire up Speech Recognition
       const micBtn = document.getElementById('micBtn');
       const nlpInput = document.getElementById('nlpCommand');
-      
+
       if (micBtn) {
         micBtn.onclick = (e) => {
           e.preventDefault();
@@ -741,6 +748,40 @@ document.addEventListener("DOMContentLoaded", async () => {
         </div>
       `;
       wireAutoGenToggle('functionalRole');
+    }
+
+    if (val === "workflow") {
+      featureBox.innerHTML = `
+        <h3 class="slide-in" style="animation-delay: 0ms">⚙️ Create Workflow</h3>
+        <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px;">
+          Complete workflow automation: Creates workflow, group, and assigns approvers.
+        </p>
+        ${autoGenToggleHTML()}
+
+        <div class="input-group slide-in" style="animation-delay: 50ms">
+          <label>Workflow Name <span style="color:var(--danger)">*</span></label>
+          <input id="workflowName" placeholder="e.g. Validation Review WF">
+        </div>
+
+        <div class="input-group slide-in" style="animation-delay: 100ms">
+          <label>Approval Period (Days) <span style="color:var(--danger)">*</span></label>
+          <input id="workflowApprovalDays" placeholder="e.g. 30" type="number" min="1">
+        </div>
+
+        <div class="input-group slide-in" style="animation-delay: 150ms">
+          <label>Frequency (Days) <span style="color:var(--danger)">*</span></label>
+          <input id="workflowFrequencyDays" placeholder="e.g. 15" type="number" min="1">
+        </div>
+
+        <div class="input-group slide-in" style="animation-delay: 200ms">
+          <label>Serial/Parallel <span style="color:var(--danger)">*</span></label>
+          <select id="workflowSerialParallel">
+            <option value="Serial">Serial</option>
+            <option value="Parallel">Parallel</option>
+          </select>
+        </div>
+      `;
+      wireAutoGenToggle('workflow');
     }
 
   }); // end featureSelect change
@@ -1080,6 +1121,36 @@ document.addEventListener("DOMContentLoaded", async () => {
       addAudit("Create Functional Role", "Running");
     }
 
+    if (feature === "workflow") {
+      endpoint = "/run/createWorkflow";
+
+      const workflowName = document.getElementById("workflowName")?.value.trim();
+      const workflowApprovalDays = document.getElementById("workflowApprovalDays")?.value.trim();
+      const workflowFrequencyDays = document.getElementById("workflowFrequencyDays")?.value.trim();
+      const workflowSerialParallel = document.getElementById("workflowSerialParallel")?.value;
+
+      if (!workflowName) {
+        alert("Workflow Name is required.");
+        document.getElementById("workflowName").focus();
+        return;
+      }
+
+      // Build the workflows array expected by the new endpoint
+      body.workflows = [{
+        name: workflowName,
+        description: `Auto-created workflow - ${workflowName}`,
+        applicableTo: ["Authoring", "Execution"],
+        reviewRequired: true,
+        approvalSteps: [{
+          periodDays: parseInt(workflowApprovalDays) || 30,
+          frequencyDays: parseInt(workflowFrequencyDays) || 15,
+          serialParallel: workflowSerialParallel || "Serial"
+        }]
+      }];
+
+      addAudit("Create Workflow", "Running");
+    }
+
     // Show spinner at start
     showSpinner(true);
     runBtn.disabled = true;
@@ -1196,7 +1267,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       'unified': 'Complete Setup Flow',
       'categories': 'Category Creation',
       'groups': 'Group Creation',
-      'functionalRole': 'Functional Role Creation'
+      'functionalRole': 'Functional Role Creation',
+      'workflow': 'Workflow Creation'
     };
     return names[operation] || operation;
   }
@@ -1227,10 +1299,10 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   /* ---------------- VOICE RECOGNITION HELPERS ---------------- */
-  
+
   function startVoiceCapture(btn, input) {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    
+
     if (!SpeechRecognition) {
       appendLog("❌ Error: Speech recognition is not supported in this browser.", "error");
       return;

@@ -1,10 +1,10 @@
 import { Page } from 'playwright';
-import { automationEvents } from '../core/browser';
-import { waitForPostback, waitForOverlayGone, waitForIframeLoaderGone } from '../core/navigation';
-import { SystemPage } from '../pages/systemPage';
-import { AdministrationPage } from '../pages/administrationPage';
-import { LoginPage } from '../pages/loginPage';
-import { DataService } from '../utils/dataService';
+import { automationEvents } from '../../core/browser';
+import { waitForPostback, waitForOverlayGone, waitForIframeLoaderGone } from '../../core/navigation';
+import { SystemPage } from '../../pages/systemPage';
+import { AdministrationPage } from '../../pages/administrationPage';
+import { LoginPage } from '../../pages/loginPage';
+import { DataService } from '../../utils/dataService';  
 
 export interface WorkflowInput {
     baseUrl: string;
@@ -21,7 +21,7 @@ export interface WorkflowResult {
     success: boolean;
     steps: {
         step: string;
-        status: 'success' | 'failed' | 'skipped';
+        status: 'in_progress' | 'success' | 'failed' | 'skipped';
         message?: string;
         data?: any;
     }[];
@@ -49,7 +49,7 @@ export async function runCompleteWorkflow(
         createdEntities: []
     };
 
-    const loginPage = new LoginPage(page);
+    const loginPage = new LoginPage(page, input.baseUrl);
     const systemPage = new SystemPage(page);
     const adminPage = new AdministrationPage(page);
 
@@ -70,7 +70,7 @@ export async function runCompleteWorkflow(
         results.steps.push({ step: 'Navigate to Workflow', status: 'in_progress' });
         automationEvents.emit('log', '📍 Navigating to System → Workflow');
         
-        await systemPage.navigateToWorkflow();
+        await systemPage.navigateToWorkflowCreate();
         await waitForPostback(page, 15000);
         await waitForOverlayGone(page);
         
@@ -200,7 +200,9 @@ export async function runCompleteWorkflow(
                 createdBy: 'automation'
             };
             const groupId = await DataService.saveEntity('group', 'CSV DEMO GROUP', groupData);
-            results.createdEntities.push({ type: 'group', id: groupId, name: 'CSV DEMO GROUP' });
+            if (results.createdEntities) {
+                results.createdEntities.push({ type: 'group', id: groupId, name: 'CSV DEMO GROUP' });
+            }
             automationEvents.emit('log', `💾 Group saved to database with ID: ${groupId}`);
         } catch (dbErr) {
             automationEvents.emit('error', `Failed to save group to database: ${String(dbErr)}`);
@@ -214,7 +216,7 @@ export async function runCompleteWorkflow(
         results.steps.push({ step: 'Add Group to Selected Groups', status: 'in_progress' });
         automationEvents.emit('log', '🔄 Navigating back to Workflow to add group');
 
-        await systemPage.navigateToWorkflow();
+        await systemPage.navigateToWorkflowCreate();
         await waitForPostback(page, 15000);
         await waitForOverlayGone(page);
 
@@ -271,7 +273,9 @@ export async function runCompleteWorkflow(
                 createdBy: 'automation'
             };
             const roleId = await DataService.saveEntity('functionalRole', input.functionalRoleName, functionalRoleData);
-            results.createdEntities.push({ type: 'functionalRole', id: roleId, name: input.functionalRoleName });
+            if (results.createdEntities) {
+                results.createdEntities.push({ type: 'functionalRole', id: roleId, name: input.functionalRoleName });
+            }
             automationEvents.emit('log', `💾 Functional role saved to database with ID: ${roleId}`);
         } catch (dbErr) {
             automationEvents.emit('error', `Failed to save functional role to database: ${String(dbErr)}`);

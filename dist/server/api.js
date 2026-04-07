@@ -494,6 +494,62 @@ app.post('/run/createFunctionalRoles', async (req, res) => {
         }
     }
 });
+// ===================== CREATE WORKFLOW =====================
+app.post('/run/createWorkflow', async (req, res) => {
+    const { baseUrl, username, password, functionalRoleName, approvalPeriodDays, frequencyDays, serialParallel } = req.body;
+    // Server-side validation
+    if (!baseUrl || !username || !password || !functionalRoleName) {
+        browser_1.automationEvents.emit('error', 'Missing required fields for workflow creation');
+        return res.status(400).json({ success: false, message: 'Missing required fields' });
+    }
+    if (functionalRoleName.length < 2 || functionalRoleName.length > 100) {
+        browser_1.automationEvents.emit('error', 'Functional role name must be between 2 and 100 characters');
+        return res.status(400).json({ success: false, message: 'Functional role name must be between 2 and 100 characters' });
+    }
+    try {
+        browser_1.automationEvents.emit('log', 'Processing workflow creation request...');
+        const result = await (0, jobRunner_1.runWorkflowAutomation)(baseUrl, username, password, functionalRoleName, approvalPeriodDays, frequencyDays, serialParallel);
+        // Generate PDF audit trail
+        const timestamp = new Date().toISOString();
+        const pdfPath = await (0, pdfGenerator_1.generateAuditPDF)({
+            operation: 'Workflow Creation',
+            timestamp,
+            adminUser: username,
+            baseUrl,
+            results: { workflow: result }
+        });
+        const fileName = pdfPath.split(/[/\\]/).pop() || 'audit-report.pdf';
+        browser_1.automationEvents.emit('log', `✓ PDF audit report generated: ${fileName}`);
+        await (0, db_1.dbRun)(`INSERT INTO audit_reports (operation, admin_user, base_url, file_name, file_path)
+       VALUES (?, ?, ?, ?, ?)`, ['Workflow Creation', username, baseUrl, fileName, pdfPath]);
+        res.json({
+            success: result.success,
+            result,
+            pdfFileName: fileName,
+            pdfDownloadUrl: `/download-audit/${fileName}`
+        });
+    }
+    catch (err) {
+        browser_1.automationEvents.emit('error', `Workflow creation failed: ${String(err)}`);
+        try {
+            const timestamp = new Date().toISOString();
+            const pdfPath = await (0, pdfGenerator_1.generateAuditPDF)({
+                operation: 'Workflow Creation',
+                timestamp,
+                adminUser: username,
+                baseUrl,
+                results: { workflow: [{ functionalRole: functionalRoleName, status: 'error', message: String(err) }] }
+            });
+            const fileName = pdfPath.split(/[/\\]/).pop() || 'audit-report.pdf';
+            await (0, db_1.dbRun)(`INSERT INTO audit_reports (operation, admin_user, base_url, file_name, file_path)
+         VALUES (?, ?, ?, ?, ?)`, ['Workflow Creation', username, baseUrl, fileName, pdfPath]);
+            res.status(500).json({ success: false, message: String(err), pdfFileName: fileName, pdfDownloadUrl: `/download-audit/${fileName}` });
+        }
+        catch {
+            res.status(500).json({ success: false, message: String(err) });
+        }
+    }
+});
 // ===================== NATURAL LANGUAGE AUTOMATION ENDPOINT =====================
 app.post('/run/transcribe', async (req, res) => {
     const { audio } = req.body;
@@ -720,48 +776,6 @@ app.post('/run/mcp-close', async (_req, res) => {
     }
     catch (err) {
         res.status(500).json({ success: false, message: String(err) });
-    }
-});
-// ===================== WORKFLOW ENDPOINTS =====================
-/**
- * Complete Workflow Automation endpoint
- */
-app.post('/run/complete-workflow', async (req, res) => {
-    try {
-        const { baseUrl, username, password, functionalRoleName, approvalPeriodDays, frequencyDays, serialParallel } = req.body;
-        // Server-side validation
-        if (!baseUrl || !username || !password || !functionalRoleName) {
-            browser_1.automationEvents.emit('error', 'Missing required fields: baseUrl, username, password, or functionalRoleName');
-            return res.status(400).json({ success: false, message: 'Missing required fields' });
-        }
-        browser_1.automationEvents.emit('log', `🚀 Starting Complete Workflow Automation for role: ${functionalRoleName}`);
-        const result = await (0, jobRunner_1.runCompleteWorkflowAutomation)(baseUrl, username, password, functionalRoleName, approvalPeriodDays ? parseInt(approvalPeriodDays) : undefined, frequencyDays ? parseInt(frequencyDays) : undefined, serialParallel || 'Serial');
-        // Log the automation run
-        const actionsCount = result.steps.filter(step => step.status === 'success').length;
-        const success = result.success;
-        const duration = Date.now() - Date.now(); // Will be calculated properly in the workflow function
-        (0, statsStore_1.logRun)('Complete Workflow', success, duration, actionsCount); // 2 minutes per action
-        res.json({
-            success: true,
-            result,
-            message: result.success ? 'Workflow completed successfully' : 'Workflow completed with errors',
-            stats: {
-                totalSteps: result.steps.length,
-                successfulSteps: result.steps.filter(s => s.status === 'success').length,
-                failedSteps: result.steps.filter(s => s.status === 'failed').length,
-                createdEntities: result.createdEntities?.length || 0
-            }
-        });
-    }
-    catch (err) {
-        const errMsg = String(err);
-        console.error('[Workflow API] Error:', errMsg);
-        browser_1.automationEvents.emit('error', `Workflow automation failed: ${errMsg}`);
-        res.status(500).json({
-            success: false,
-            message: errMsg,
-            error: errMsg
-        });
     }
 });
 // ── DATA MANAGEMENT API ENDPOINTS ────────────────────────────────────────

@@ -76,15 +76,16 @@ class SystemPage {
         ]);
         await this.page.waitForTimeout(800);
     }
-    /**
-     * Navigates to System → Workflow.
-     */
-    async navigateToWorkflow() {
+    async navigateToWorkflowCreate() {
         await this.systemButton.click();
         await this.page.waitForLoadState('load');
-        // Find and click Workflow menu item
-        const workflowButton = this.page.getByText('Workflow');
-        await workflowButton.click();
+        await this.createTab.hover();
+        await this.page.waitForTimeout(500);
+        const workFlowCreationButton = this.page.getByText('Create workflow to route tasks and deliverables in serial, parallel, or hybrid p...');
+        await Promise.all([
+            this.page.waitForLoadState('load'),
+            workFlowCreationButton.click()
+        ]);
         await this.page.waitForTimeout(800);
     }
 }

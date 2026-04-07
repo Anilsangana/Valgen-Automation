@@ -5,7 +5,7 @@ import path from 'path';
 
 import bodyParser from 'body-parser';
 
-import { runCreateRoles, runAll, runCreateUsers, runUnifiedFlow, runDeactivateUsers, runCreateDepartments, runCreateCategories, runCreateGroups, runCreateSubCategories, runCreateFunctionalRoles } from './jobRunner';import { automationEvents } from '../core/browser';
+import { runCreateRoles, runAll, runCreateUsers, runUnifiedFlow, runDeactivateUsers, runCreateDepartments, runCreateCategories, runCreateGroups, runCreateSubCategories, runCreateFunctionalRoles, runWorkflowAutomation, runCreateWorkflows } from './jobRunner';import { automationEvents } from '../core/browser';
 import { generateAuditPDF, getAuditReports } from '../utils/pdfGenerator';
 import { executeNLPCommand, transcribeVoice } from '../actions/nlp/nlpAutomation';
 import { getOrCreateEngine, closeEngine } from '../actions/ai/ollamaAutomation';
@@ -616,6 +616,65 @@ app.post('/run/createFunctionalRoles', async (req, res) => {
         adminUser: username,
         baseUrl,
         results: { functionalRole: [{ functionalRole: functionalRoles[0]?.name || 'N/A', status: 'error', message: String(err) }] }
+      });
+      const fileName = pdfPath.split(/[/\\]/).pop() || 'audit-report.pdf';
+      res.status(500).json({ success: false, message: String(err), pdfFileName: fileName, pdfDownloadUrl: `/download-audit/${fileName}` });
+    } catch {
+      res.status(500).json({ success: false, message: String(err) });
+    }
+  }
+});
+
+// ===================== CREATE WORKFLOW =====================
+app.post('/run/createWorkflow', async (req, res) => {
+  const { baseUrl, username, password, workflows } = req.body;
+
+  // Server-side validation
+  if (!baseUrl || !username || !password || !workflows) {
+    automationEvents.emit('error', 'Missing required fields for workflow creation');
+    return res.status(400).json({ success: false, message: 'Missing required fields: baseUrl, username, password, workflows' });
+  }
+
+  if (!Array.isArray(workflows) || workflows.length === 0) {
+    automationEvents.emit('error', 'Workflows must be a non-empty array');
+    return res.status(400).json({ success: false, message: 'Workflows must be a non-empty array' });
+  }
+
+  try {
+    automationEvents.emit('log', 'Processing workflow creation request...');
+    const result = await runCreateWorkflows(baseUrl, username, password, workflows);
+
+    const hasSuccess = result.some((r: any) => r.status === 'created');
+
+    // Generate PDF audit trail
+    const timestamp = new Date().toISOString();
+    const pdfPath = await generateAuditPDF({
+      operation: 'Workflow Creation',
+      timestamp,
+      adminUser: username,
+      baseUrl,
+      results: { workflow: result }
+    });
+
+    const fileName = pdfPath.split(/[/\\]/).pop() || 'audit-report.pdf';
+    automationEvents.emit('log', `✓ PDF audit report generated: ${fileName}`);
+
+    res.json({
+      success: hasSuccess,
+      result,
+      pdfFileName: fileName,
+      pdfDownloadUrl: `/download-audit/${fileName}`
+    });
+  } catch (err) {
+    automationEvents.emit('error', `Workflow creation failed: ${String(err)}`);
+    try {
+      const timestamp = new Date().toISOString();
+      const pdfPath = await generateAuditPDF({
+        operation: 'Workflow Creation',
+        timestamp,
+        adminUser: username,
+        baseUrl,
+        results: { workflow: [{ workflow: 'N/A', status: 'error', message: String(err) }] }
       });
       const fileName = pdfPath.split(/[/\\]/).pop() || 'audit-report.pdf';
       res.status(500).json({ success: false, message: String(err), pdfFileName: fileName, pdfDownloadUrl: `/download-audit/${fileName}` });
