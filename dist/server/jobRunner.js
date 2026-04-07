@@ -13,6 +13,7 @@ exports.runCreateCategories = runCreateCategories;
 exports.runCreateGroups = runCreateGroups;
 exports.runCreateSubCategories = runCreateSubCategories;
 exports.runCreateFunctionalRoles = runCreateFunctionalRoles;
+exports.runWorkflowAutomation = runWorkflowAutomation;
 const path_1 = __importDefault(require("path"));
 const fs_1 = __importDefault(require("fs"));
 const browser_1 = require("../core/browser");
@@ -27,6 +28,7 @@ const createCategory_1 = require("../actions/createCategory");
 const createSubCategory_1 = require("../actions/createSubCategory");
 const createGroup_1 = require("../actions/createGroup");
 const createFunctionalRole_1 = require("../actions/createFunctionalRole");
+const completeWorkflow_1 = require("../actions/workflow/completeWorkflow");
 // ===================== CREATE ROLES =====================
 async function runCreateRoles(baseUrl, username, password, roleName, duplicateStrategy = 'skip', permissions) {
     // Backend validation
@@ -428,6 +430,55 @@ async function runCreateFunctionalRoles(baseUrl, username, password, functionalR
     }
     catch (err) {
         browser_1.automationEvents.emit('error', `Error during functional role creation: ${String(err)}`);
+        throw err;
+    }
+    finally {
+        await browser.close();
+    }
+}
+// ===================== COMPLETE WORKFLOW =====================
+async function runWorkflowAutomation(baseUrl, username, password, functionalRoleName, approvalPeriodDays, frequencyDays, serialParallel) {
+    // Backend validation
+    if (!baseUrl || !username || !password || !functionalRoleName) {
+        throw new Error('Missing required fields: baseUrl, username, password, functionalRoleName');
+    }
+    if (functionalRoleName.length < 2 || functionalRoleName.length > 100) {
+        throw new Error('Functional role name must be between 2 and 100 characters');
+    }
+    const { browser, context } = await (0, browser_1.launchBrowser)({ headless: false });
+    const page = await (0, browser_1.newPage)(context);
+    browser_1.automationEvents.emit('log', '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    browser_1.automationEvents.emit('log', 'Starting Workflow Automation');
+    browser_1.automationEvents.emit('log', '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    try {
+        const input = {
+            baseUrl,
+            username,
+            password,
+            functionalRoleName,
+            approvalPeriodDays,
+            frequencyDays,
+            serialParallel: serialParallel || 'Serial',
+            generateData: true
+        };
+        browser_1.automationEvents.emit('log', `Creating workflow with functional role: ${functionalRoleName}`);
+        const result = await (0, completeWorkflow_1.runCompleteWorkflow)(page, input);
+        if (result.success) {
+            browser_1.automationEvents.emit('log', '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+            browser_1.automationEvents.emit('log', '✅ Workflow automation completed successfully!');
+            browser_1.automationEvents.emit('log', '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        }
+        else {
+            browser_1.automationEvents.emit('log', '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+            browser_1.automationEvents.emit('error', '❌ Workflow automation completed with failures');
+            browser_1.automationEvents.emit('log', '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        }
+        return result;
+    }
+    catch (err) {
+        browser_1.automationEvents.emit('log', '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        browser_1.automationEvents.emit('error', `❌ Workflow automation failed: ${String(err)}`);
+        browser_1.automationEvents.emit('log', '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
         throw err;
     }
     finally {

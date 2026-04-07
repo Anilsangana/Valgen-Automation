@@ -225,6 +225,64 @@ p {
   animation: pulse-success 2s infinite cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+/* =========================================================
+   NAVIGATION LINKS
+========================================================= */
+.nav-links {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.nav-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  color: var(--text-muted);
+  text-decoration: none;
+  border-radius: var(--r-md);
+  font-weight: 600;
+  font-size: 0.85rem;
+  transition: all var(--transition-fast);
+  background: transparent;
+  border: 1px solid transparent;
+}
+
+.nav-link:hover {
+  color: var(--text-main);
+  background: rgba(255, 255, 255, 0.05);
+  border-color: var(--border-subtle);
+}
+
+.nav-link.active {
+  color: white;
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.nav-link.primary {
+  background: linear-gradient(135deg, #00A3E0 0%, #0052A5 100%);
+  color: white;
+  border: none;
+}
+
+.nav-link.primary:hover {
+  transform: scale(1.05);
+  box-shadow: 0 4px 15px rgba(0, 163, 224, 0.4);
+}
+
+.nav-link.secondary {
+  background: linear-gradient(135deg, #1a6b3c 0%, #2ea043 100%);
+  color: white;
+  border: none;
+}
+
+.nav-link.secondary:hover {
+  transform: scale(1.05);
+  box-shadow: 0 4px 15px rgba(46, 160, 67, 0.4);
+}
+
 @keyframes pulse-success {
   0%, 100% { transform: scale(1); opacity: 1; }
   50% { transform: scale(1.5); opacity: 0.5; }
@@ -726,12 +784,89 @@ button.loading .spinner {
   transform: translateX(-50%) translateY(4px);
 }
 
-/* Micro-interaction adding a pulse when things become active */
-.pulse-active {
-  animation: pulseOnce 0.4s ease-out;
+/* =========================================================
+   QUICK CHIPS & VOICE CONTROL
+========================================================= */
+.voice-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
 }
-@keyframes pulseOnce {
-  0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7); }
-  70% { box-shadow: 0 0 0 10px rgba(59, 130, 246, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+
+.mic-btn {
+  position: absolute;
+  right: 12px;
+  top: 12px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--bg-surface-elevated);
+  border: 1px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all var(--transition-bounce);
+  color: var(--text-muted);
+}
+
+.mic-btn:hover {
+  background: var(--primary);
+  color: white;
+  transform: scale(1.1);
+  box-shadow: var(--shadow-glow);
+}
+
+.mic-btn.recording {
+  background: var(--danger);
+  color: white;
+  animation: mic-pulse 1.5s infinite;
+}
+
+@keyframes mic-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+  70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+}
+
+.quick-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 4px 0;
+}
+
+.chip {
+  padding: 6px 14px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-full);
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.chip:hover {
+  background: var(--bg-surface-elevated);
+  border-color: var(--primary);
+  color: var(--text-main);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-sm);
+}
+
+.chip svg {
+  width: 14px;
+  height: 14px;
+  opacity: 0.7;
+}
+
+.chip:active {
+  transform: scale(0.95);
 }

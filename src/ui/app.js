@@ -1,4 +1,4 @@
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
 
   const logArea = document.getElementById("logArea");
   const auditList = document.getElementById("auditList");
@@ -11,6 +11,14 @@ document.addEventListener("DOMContentLoaded", () => {
   if (!featureSelect || !categorySelect) {
     console.error("featureSelect or categorySelect not found in DOM");
     return;
+  }
+
+  // Initialize data persistence
+  try {
+    await window.dataPersistence.init('');
+    console.log('Data persistence initialized');
+  } catch (err) {
+    console.error('Failed to initialize data persistence:', err);
   }
 
   /* ---------------- CATEGORY → FEATURE MAP ---------------- */
@@ -29,7 +37,8 @@ document.addEventListener("DOMContentLoaded", () => {
       { value: "categories", label: "🗂️ Create Category" },
       { value: "subCategories", label: "📁 Create Sub Category" },
       { value: "groups", label: "👥 Create Group" },
-      { value: "functionalRole", label: "🔑 Create Functional Role" }
+      { value: "functionalRole", label: "🔑 Create Functional Role" },
+      { value: "workflow", label: "⚙️ Create Workflow" }
     ],
     advanced: [
       { value: "unified", label: "⚡ Complete Setup (Role → Dept → User → Deactivate)" }
@@ -195,6 +204,12 @@ document.addEventListener("DOMContentLoaded", () => {
         fnRolePrefix: id.slice(0, 3).toUpperCase(),
         fnRoleDescription: `Auto-generated functional role - ${id}`
       },
+      workflow: {
+        workflowName: `AutoWF_${id}`,
+        workflowApprovalDays: 30,
+        workflowFrequencyDays: 15,
+        workflowSerialParallel: 'Serial'
+      },
       unified: {
         unifiedRoleName: `AutoRole_${id}`,
         unifiedDeptName: `AutoDept_${id}`,
@@ -231,28 +246,108 @@ document.addEventListener("DOMContentLoaded", () => {
   // Expose on window so inline onchange handlers in HTML strings can reach it
   window.applyAutoGenerate = applyAutoGenerate;
 
-  // Single helper: wires up the toggle's visual animation + field fill after a form is rendered
-  function wireAutoGenToggle(type) {
-    const toggle = document.getElementById('autoGenToggle');
-    if (!toggle) return;
-    toggle.addEventListener('change', function () {
-      const track = document.getElementById('autoGenTrack');
-      const thumb = document.getElementById('autoGenThumb');
-      const banner = document.getElementById('autoGenBanner');
-      if (this.checked) {
-        track.style.background = '#10b981';
-        thumb.style.transform = 'translateX(20px)';
-        banner.style.background = 'linear-gradient(135deg,rgba(16,185,129,0.2) 0%,rgba(5,150,105,0.2) 100%)';
-        banner.style.borderColor = 'rgba(16,185,129,0.5)';
-      } else {
-        track.style.background = '#444';
-        thumb.style.transform = 'translateX(0)';
-        banner.style.background = 'linear-gradient(135deg,rgba(0,163,224,0.12) 0%,rgba(0,82,165,0.12) 100%)';
-        banner.style.borderColor = 'rgba(0,163,224,0.3)';
+  // Form data persistence functions
+  async function saveCurrentFormState() {
+    const formData = {
+      category: categorySelect.value,
+      feature: featureSelect.value,
+      baseUrl: document.getElementById('baseUrl')?.value || '',
+      username: document.getElementById('username')?.value || '',
+      // Save dynamic form inputs
+      dynamicInputs: {}
+    };
+
+    // Save all dynamic input values
+    const dynamicInputs = featureBox.querySelectorAll('input, select, textarea');
+    dynamicInputs.forEach(input => {
+      if (input.id) {
+        formData.dynamicInputs[input.id] = input.value;
       }
-      applyAutoGenerate(type, this.checked);
+    });
+
+    await window.dataPersistence.saveFormData('main_automation', formData);
+  }
+
+  async function restoreFormState() {
+    const savedData = await window.dataPersistence.getFormData('main_automation');
+    if (savedData) {
+      // Restore category and feature
+      if (savedData.category) {
+        categorySelect.value = savedData.category;
+        categorySelect.dispatchEvent(new Event('change'));
+
+        // Wait for feature options to be populated
+        setTimeout(() => {
+          if (savedData.feature) {
+            featureSelect.value = savedData.feature;
+            featureSelect.dispatchEvent(new Event('change'));
+          }
+        }, 100);
+      }
+
+      // Restore basic inputs
+      if (savedData.baseUrl) {
+        const baseUrlInput = document.getElementById('baseUrl');
+        if (baseUrlInput) baseUrlInput.value = savedData.baseUrl;
+      }
+      if (savedData.username) {
+        const usernameInput = document.getElementById('username');
+        if (usernameInput) usernameInput.value = savedData.username;
+      }
+
+      // Restore dynamic inputs
+      setTimeout(() => {
+        if (savedData.dynamicInputs) {
+          Object.entries(savedData.dynamicInputs).forEach(([id, value]) => {
+            const input = document.getElementById(id);
+            if (input) input.value = value;
+          });
+        }
+      }, 200);
+
+      console.log('Form state restored');
+    }
+  }
+
+  // Auto-save form data on changes
+  function setupAutoSave() {
+    // Save on category/feature change
+    categorySelect.addEventListener('change', saveCurrentFormState);
+    featureSelect.addEventListener('change', saveCurrentFormState);
+
+    // Save on input changes (with debounce)
+    let saveTimeout;
+    const debouncedSave = () => {
+      clearTimeout(saveTimeout);
+      saveTimeout = setTimeout(saveCurrentFormState, 1000);
+    };
+
+    // Monitor dynamic inputs
+    const observer = new MutationObserver(() => {
+      // New inputs added, set up auto-save for them
+      featureBox.querySelectorAll('input, select, textarea').forEach(input => {
+        if (!input.hasAttribute('data-autosave')) {
+          input.setAttribute('data-autosave', 'true');
+          input.addEventListener('input', debouncedSave);
+          input.addEventListener('change', debouncedSave);
+        }
+      });
+    });
+
+    observer.observe(featureBox, { childList: true, subtree: true });
+
+    // Initial setup for existing inputs
+    featureBox.querySelectorAll('input, select, textarea').forEach(input => {
+      input.setAttribute('data-autosave', 'true');
+      input.addEventListener('input', debouncedSave);
+      input.addEventListener('change', debouncedSave);
     });
   }
+
+  // Initialize form persistence
+  restoreFormState().then(() => {
+    setupAutoSave();
+  });
 
   function autoGenToggleHTML() {
     return `
@@ -288,6 +383,29 @@ document.addEventListener("DOMContentLoaded", () => {
     `;
   }
 
+  // Single helper: wires up the toggle's visual animation + field fill after a form is rendered
+  function wireAutoGenToggle(type) {
+    const toggle = document.getElementById('autoGenToggle');
+    if (!toggle) return;
+    toggle.addEventListener('change', function () {
+      const track = document.getElementById('autoGenTrack');
+      const thumb = document.getElementById('autoGenThumb');
+      const banner = document.getElementById('autoGenBanner');
+      if (this.checked) {
+        track.style.background = '#10b981';
+        thumb.style.transform = 'translateX(20px)';
+        banner.style.background = 'linear-gradient(135deg,rgba(16,185,129,0.2) 0%,rgba(5,150,105,0.2) 100%)';
+        banner.style.borderColor = 'rgba(16,185,129,0.5)';
+      } else {
+        track.style.background = '#444';
+        thumb.style.transform = 'translateX(0)';
+        banner.style.background = 'linear-gradient(135deg,rgba(0,163,224,0.12) 0%,rgba(0,82,165,0.12) 100%)';
+        banner.style.borderColor = 'rgba(0,163,224,0.3)';
+      }
+      applyAutoGenerate(type, this.checked);
+    });
+  }
+
   /* ---------------- FEATURE DROPDOWN ---------------- */
 
   featureSelect.addEventListener("change", () => {
@@ -300,29 +418,75 @@ document.addEventListener("DOMContentLoaded", () => {
       featureBox.innerHTML = `
         <h3 class="slide-in" style="animation-delay: 0ms">🤖 Natural Language Automation</h3>
         <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px;">
-          Describe what you want to automate in plain English. The AI will execute your commands using Playwright.
+          Describe what you want to automate in plain English, use your voice, or click a Quick Action below.
         </p>
 
         <div class="input-group slide-in" style="animation-delay: 50ms">
-          <label>Natural Language Command <span style="color:var(--danger)">*</span></label>
-          <textarea 
-            id="nlpCommand" 
-            placeholder='Example: "Login with these credentials username and password and create a role Associate with role type Review and Approve"'
-            rows="4"
-            style="width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text); font-family: inherit; font-size: 14px; resize: vertical;"
-          ></textarea>
+          <label>Your Instructions <span style="color:var(--danger)">*</span></label>
+          <div class="voice-input-wrapper">
+            <textarea 
+              id="nlpCommand" 
+              placeholder='Example: "Login and create a functional role called Lead Researcher"'
+              rows="4"
+              style="width: 100%; padding: 12px 48px 12px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text); font-family: inherit; font-size: 14px; resize: vertical;"
+            ></textarea>
+            <button id="micBtn" class="mic-btn" title="Click to speak your command">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"></path>
+                <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                <line x1="12" y1="19" x2="12" y2="22"></line>
+              </svg>
+            </button>
+          </div>
         </div>
 
-        <div class="info-box slide-in" style="animation-delay: 100ms; background: rgba(0, 163, 224, 0.1); border-left: 3px solid var(--primary); padding: 12px; border-radius: 6px; margin-top: 12px;">
+        <div class="quick-chips slide-in" style="animation-delay: 80ms">
+          <div class="chip" data-cmd="Login with credits and create a unique functional role called 'AI Lead Auditor'">
+            <span>🎭</span> Role
+          </div>
+          <div class="chip" data-cmd="Navigate to system and create a Category named 'Smart Automation' and a SubCategory named 'AI Testing' under it">
+            <span>📦</span> Category Chain
+          </div>
+          <div class="chip" data-cmd="Create a group named 'Validation Team' with all users selected">
+            <span>👥</span> Group
+          </div>
+          <div class="chip" data-cmd="Navigate to Administration and create a Department named 'Compliance Lab'">
+            <span>🏢</span> Dept
+          </div>
+        </div>
+
+        <div class="info-box slide-in" style="animation-delay: 150ms; background: rgba(59, 130, 246, 0.08); border-left: 3px solid var(--primary); padding: 12px; border-radius: 6px; margin-top: 16px;">
           <div style="font-size: 12px; color: var(--text-muted);">
-            <strong style="color: var(--primary);">💡 Pro Tips:</strong><br>
-            • Be specific about credentials and values<br>
-            • Mention exact field names and options<br>
-            • Chain multiple actions in one command<br>
-            • System will use credentials from Connection Settings above
+            <strong style="color: var(--primary);">🚀 Efficiency Power:</strong><br>
+            • 🎙️ <strong>Speak:</strong> Click the mic icon to dictate your commands instantly.<br>
+            • ⚡ <strong>Chips:</strong> Click any chip above to pre-fill a smart, unique command.<br>
+            • 🤖 <strong>Framework:</strong> The AI uses your existing robot code for maximum speed.
           </div>
         </div>
       `;
+
+      // Wire up Speech Recognition
+      const micBtn = document.getElementById('micBtn');
+      const nlpInput = document.getElementById('nlpCommand');
+
+      if (micBtn) {
+        micBtn.onclick = (e) => {
+          e.preventDefault();
+          startVoiceCapture(micBtn, nlpInput);
+        };
+      }
+
+      // Wire up Quick Chips
+      const chips = document.querySelectorAll('.chip');
+      chips.forEach(chip => {
+        chip.onclick = () => {
+          nlpInput.value = chip.getAttribute('data-cmd');
+          nlpInput.style.borderColor = 'var(--primary)';
+          setTimeout(() => nlpInput.style.borderColor = '', 1000);
+          appendLog("✨ Quick action loaded into prompt.");
+        };
+      });
+
     }
 
     if (val === "roles") {
@@ -586,6 +750,40 @@ document.addEventListener("DOMContentLoaded", () => {
       wireAutoGenToggle('functionalRole');
     }
 
+    if (val === "workflow") {
+      featureBox.innerHTML = `
+        <h3 class="slide-in" style="animation-delay: 0ms">⚙️ Create Workflow</h3>
+        <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px;">
+          Complete workflow automation: Creates workflow, group, and assigns approvers.
+        </p>
+        ${autoGenToggleHTML()}
+
+        <div class="input-group slide-in" style="animation-delay: 50ms">
+          <label>Workflow Name <span style="color:var(--danger)">*</span></label>
+          <input id="workflowName" placeholder="e.g. Validation Review WF">
+        </div>
+
+        <div class="input-group slide-in" style="animation-delay: 100ms">
+          <label>Approval Period (Days) <span style="color:var(--danger)">*</span></label>
+          <input id="workflowApprovalDays" placeholder="e.g. 30" type="number" min="1">
+        </div>
+
+        <div class="input-group slide-in" style="animation-delay: 150ms">
+          <label>Frequency (Days) <span style="color:var(--danger)">*</span></label>
+          <input id="workflowFrequencyDays" placeholder="e.g. 15" type="number" min="1">
+        </div>
+
+        <div class="input-group slide-in" style="animation-delay: 200ms">
+          <label>Serial/Parallel <span style="color:var(--danger)">*</span></label>
+          <select id="workflowSerialParallel">
+            <option value="Serial">Serial</option>
+            <option value="Parallel">Parallel</option>
+          </select>
+        </div>
+      `;
+      wireAutoGenToggle('workflow');
+    }
+
   }); // end featureSelect change
 
   /* ---------------- POST HELPER ---------------- */
@@ -632,26 +830,26 @@ document.addEventListener("DOMContentLoaded", () => {
     const isAutoGen = document.getElementById('autoGenToggle')?.checked || false;
 
     const baseUrl = document.getElementById("baseUrl").value.trim();
-    if (!baseUrl) {
+    if (!baseUrl && feature !== "nlp") {
       alert("Base URL is required.");
       document.getElementById("baseUrl").focus();
       return;
     }
-    if (!baseUrl.startsWith('http://') && !baseUrl.startsWith('https://')) {
+    if (baseUrl && !baseUrl.startsWith('http://') && !baseUrl.startsWith('https://') && feature !== "nlp") {
       alert("Base URL must start with http:// or https://");
       document.getElementById("baseUrl").focus();
       return;
     }
 
     const username = document.getElementById("username").value.trim();
-    if (!username) {
+    if (!username && feature !== "nlp") {
       alert("Username is required.");
       document.getElementById("username").focus();
       return;
     }
 
     const password = document.getElementById("password").value.trim();
-    if (!password) {
+    if (!password && feature !== "nlp") {
       alert("Password is required.");
       document.getElementById("password").focus();
       return;
@@ -923,6 +1121,36 @@ document.addEventListener("DOMContentLoaded", () => {
       addAudit("Create Functional Role", "Running");
     }
 
+    if (feature === "workflow") {
+      endpoint = "/run/createWorkflow";
+
+      const workflowName = document.getElementById("workflowName")?.value.trim();
+      const workflowApprovalDays = document.getElementById("workflowApprovalDays")?.value.trim();
+      const workflowFrequencyDays = document.getElementById("workflowFrequencyDays")?.value.trim();
+      const workflowSerialParallel = document.getElementById("workflowSerialParallel")?.value;
+
+      if (!workflowName) {
+        alert("Workflow Name is required.");
+        document.getElementById("workflowName").focus();
+        return;
+      }
+
+      // Build the workflows array expected by the new endpoint
+      body.workflows = [{
+        name: workflowName,
+        description: `Auto-created workflow - ${workflowName}`,
+        applicableTo: ["Authoring", "Execution"],
+        reviewRequired: true,
+        approvalSteps: [{
+          periodDays: parseInt(workflowApprovalDays) || 30,
+          frequencyDays: parseInt(workflowFrequencyDays) || 15,
+          serialParallel: workflowSerialParallel || "Serial"
+        }]
+      }];
+
+      addAudit("Create Workflow", "Running");
+    }
+
     // Show spinner at start
     showSpinner(true);
     runBtn.disabled = true;
@@ -1039,7 +1267,8 @@ document.addEventListener("DOMContentLoaded", () => {
       'unified': 'Complete Setup Flow',
       'categories': 'Category Creation',
       'groups': 'Group Creation',
-      'functionalRole': 'Functional Role Creation'
+      'functionalRole': 'Functional Role Creation',
+      'workflow': 'Workflow Creation'
     };
     return names[operation] || operation;
   }
@@ -1067,6 +1296,46 @@ document.addEventListener("DOMContentLoaded", () => {
     };
 
     resultsSection.insertBefore(downloadBtn, resultsSection.firstChild);
+  }
+
+  /* ---------------- VOICE RECOGNITION HELPERS ---------------- */
+
+  function startVoiceCapture(btn, input) {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+    if (!SpeechRecognition) {
+      appendLog("❌ Error: Speech recognition is not supported in this browser.", "error");
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'en-US';
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+
+    recognition.onstart = () => {
+      btn.classList.add('recording');
+      input.placeholder = "Listening... Speak your command now.";
+      appendLog("🎙️ Listening... (Voice Capture Active)");
+    };
+
+    recognition.onresult = (event) => {
+      const transcript = event.results[0][0].transcript;
+      input.value = transcript;
+      appendLog(`🎤 Captured: "${transcript}"`);
+    };
+
+    recognition.onerror = (event) => {
+      appendLog(`❌ Speech Error: ${event.error}`, "error");
+      btn.classList.remove('recording');
+    };
+
+    recognition.onend = () => {
+      btn.classList.remove('recording');
+      input.placeholder = 'Example: "Login and create a functional role called Lead Researcher"';
+    };
+
+    recognition.start();
   }
 
 });

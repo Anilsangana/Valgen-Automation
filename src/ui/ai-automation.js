@@ -129,6 +129,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
     /* ---------------- DISPLAY RESULTS ---------------- */
 
+    /* ---------------- DISPLAY RESULTS ---------------- */
+
     function displayResults(result) {
         resultsList.innerHTML = '';
 
@@ -138,58 +140,69 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
         }
 
+        // Show AI Summary if available
+        if (result.summary) {
+            const summaryDiv = document.createElement('div');
+            summaryDiv.className = 'result-item';
+            summaryDiv.style.borderLeft = '4px solid #3b82f6';
+            summaryDiv.style.background = 'rgba(59, 130, 246, 0.05)';
+            summaryDiv.innerHTML = `
+                <h4 style="color: #3b82f6; margin-bottom: 8px;">🧠 AI Verification Summary</h4>
+                <p style="font-size: 14px; line-height: 1.5;">${result.summary}</p>
+            `;
+            resultsList.appendChild(summaryDiv);
+        }
+
+        // Show Evidence Gallery if screenshots exist
+        if (result.screenshots && result.screenshots.length > 0) {
+            const galleryDiv = document.createElement('div');
+            galleryDiv.className = 'result-item';
+            galleryDiv.innerHTML = `
+                <h4 style="margin-bottom: 12px;">📸 Captured Visual Evidence</h4>
+                <div style="display: flex; gap: 15px; overflow-x: auto; padding-bottom: 10px;">
+                    ${result.screenshots.map(ss => `
+                        <div style="flex: 0 0 200px;">
+                            <img src="${ss.path}" style="width: 100%; border-radius: 6px; border: 1px solid var(--border); box-shadow: 0 4px 6px rgba(0,0,0,0.1); cursor: pointer;" onclick="window.open('${ss.path}', '_blank')">
+                            <p style="font-size: 11px; margin-top: 5px; color: var(--text-muted); line-height: 1.2;">${ss.caption}</p>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+            resultsList.appendChild(galleryDiv);
+        }
+
         const actionsDiv = document.createElement('div');
-        actionsDiv.innerHTML = '<h3 style="margin-bottom: 15px;">📋 Actions Performed:</h3>';
+        actionsDiv.innerHTML = '<h3 style="margin-bottom: 15px; margin-top: 20px;">📋 Detailed Audit Log:</h3>';
 
         result.actions.forEach((action, index) => {
             const actionCard = document.createElement('div');
             actionCard.className = 'result-item';
             actionCard.style.marginBottom = '10px';
 
-            let actionHtml = `<h4>Action ${index + 1}: ${getActionEmoji(action.action)} ${formatActionName(action.action)}</h4>`;
+            let actionHtml = `<h4>Step ${index + 1}: ${getActionEmoji(action.action)} ${formatActionName(action.action)}</h4>`;
 
-            // Add action-specific details
-            if (action.url) {
-                actionHtml += `<p><strong>URL:</strong> <a href="${action.url}" target="_blank">${action.url}</a></p>`;
-            }
-            if (action.path) {
-                actionHtml += `<p><strong>Screenshot:</strong> ${action.path}</p>`;
-            }
-            if (action.target) {
-                actionHtml += `<p><strong>Target:</strong> ${action.target}</p>`;
-            }
-            if (action.field && action.value) {
-                actionHtml += `<p><strong>Field:</strong> ${action.field} | <strong>Value:</strong> ${action.value}</p>`;
-            }
-            if (action.username) {
-                actionHtml += `<p><strong>Username:</strong> ${action.username}</p>`;
+            if (action.status === 'completed' || action.status === 'sub-item-failed' || action.status.includes('warning')) {
+                const color = action.status === 'completed' ? '#3fb950' : (action.status.includes('warning') ? '#d29922' : '#f85149');
+                actionHtml += `<p><strong>Status:</strong> <span style="color: ${color}; font-weight: bold;">${action.status.toUpperCase()}</span></p>`;
             }
 
-            actionHtml += `<p><strong>Status:</strong> <span style="color: lightgreen;">✓ ${action.status}</span></p>`;
+            if (action.detail && Array.isArray(action.detail)) {
+                actionHtml += `<ul style="margin-left: 20px; font-size: 13px; color: var(--text-muted);">`;
+                action.detail.forEach(d => {
+                    const dCol = d.status === 'error' || d.status === 'failed' ? '#f85149' : (d.status === 'skipped' ? '#d29922' : '#3fb950');
+                    actionHtml += `<li>${d.role || d.department || d.category || d.subCategory || d.group || 'Item'} - <span style="color:${dCol}">${d.status}</span></li>`;
+                });
+                actionHtml += `</ul>`;
+            }
 
             actionCard.innerHTML = actionHtml;
             actionsDiv.appendChild(actionCard);
         });
 
-        // Show screenshot info if available
-        if (result.screenshot) {
-            const screenshotDiv = document.createElement('div');
-            screenshotDiv.className = 'result-item';
-            screenshotDiv.style.marginTop = '15px';
-            screenshotDiv.style.background = 'rgba(0, 163, 224, 0.1)';
-            screenshotDiv.innerHTML = `
-        <h4>📸 Screenshot Captured</h4>
-        <p><strong>Location:</strong> ${result.screenshot}</p>
-        <p style="font-size: 12px; color: var(--text-muted); margin-top: 8px;">
-          Check the <code>audit-reports/</code> folder in your project directory to view the screenshot.
-        </p>
-      `;
-            actionsDiv.appendChild(screenshotDiv);
-        }
-
         resultsList.appendChild(actionsDiv);
         resultsSection.style.display = 'block';
     }
+
 
     function getActionEmoji(action) {
         const emojis = {
@@ -238,6 +251,92 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Initial message
     appendLog("✅ AI Automation Ready!");
-    appendLog("💡 Enter a command above and click 'Run AI Automation' to get started.");
+    appendLog("💡 Use voice or chips for faster automation.");
+
+    /* ---------------- VOICE RECORDING (ROBUST) ---------------- */
+    const micBtn = document.getElementById('micBtn');
+    let mediaRecorder;
+    let audioChunks = [];
+    let isRecording = false;
+
+    if (micBtn) {
+        micBtn.onclick = async (e) => {
+            e.preventDefault();
+            if (!isRecording) {
+                startRecording();
+            } else {
+                stopRecording();
+            }
+        };
+    }
+
+    async function startRecording() {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            mediaRecorder = new MediaRecorder(stream);
+            audioChunks = [];
+
+            mediaRecorder.ondataavailable = (event) => {
+                audioChunks.push(event.data);
+            };
+
+            mediaRecorder.onstop = async () => {
+                const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                const reader = new FileReader();
+                reader.readAsDataURL(audioBlob);
+                reader.onloadend = async () => {
+                    const base64Audio = reader.result.split(',')[1];
+                    await transcribeAudio(base64Audio);
+                };
+            };
+
+            mediaRecorder.start();
+            isRecording = true;
+            micBtn.classList.add('recording');
+            aiCommand.placeholder = "🔴 Recording... Stop when finished.";
+            appendLog("🎙️ Recording started...");
+        } catch (err) {
+            appendLog("❌ Microphone Access Denied: " + err.message, "error");
+        }
+    }
+
+    function stopRecording() {
+        if (mediaRecorder && isRecording) {
+            mediaRecorder.stop();
+            isRecording = false;
+            micBtn.classList.remove('recording');
+            aiCommand.placeholder = "Processing your voice...";
+            appendLog("⏹️ Recording stopped. Transcribing...");
+            // Stop all tracks to release mic
+            mediaRecorder.stream.getTracks().forEach(track => track.stop());
+        }
+    }
+
+    async function transcribeAudio(base64) {
+        try {
+            const res = await post("/run/transcribe", { audio: base64 });
+            if (res.success && res.text) {
+                aiCommand.value = res.text;
+                appendLog(`🎤 Voice Captured: "${res.text}"`);
+                aiCommand.placeholder = 'Example: "Login and create a unique functional role called Lead Researcher"';
+            } else {
+                appendLog("❌ Transcription failed", "error");
+            }
+        } catch (err) {
+            appendLog("❌ AI Transcription error: " + err.message, "error");
+        }
+    }
+
+    /* ---------------- QUICK CHIPS ---------------- */
+    const chips = document.querySelectorAll('.chip');
+    chips.forEach(chip => {
+        chip.onclick = () => {
+            aiCommand.value = chip.getAttribute('data-cmd');
+            aiCommand.style.borderColor = 'var(--primary)';
+            setTimeout(() => aiCommand.style.borderColor = '', 1000);
+            appendLog("✨ Quick action loaded into prompt.");
+        };
+    });
 
 });
+

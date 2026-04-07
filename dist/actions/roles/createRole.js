@@ -4,6 +4,7 @@ exports.createRole = createRole;
 const browser_1 = require("../../core/browser");
 const navigation_1 = require("../../core/navigation");
 const administrationPage_1 = require("../../pages/administrationPage");
+const dataService_1 = require("../../utils/dataService");
 async function configureRolePermissions(frame, page, roleName) {
     browser_1.automationEvents.emit('log', 'Saving role permissions');
     await page.mouse.move(1, 1);
@@ -103,10 +104,28 @@ async function createRole(page, roles, options = {}) {
                     await frame.locator('#btnSubmit').click();
                     await (0, navigation_1.waitForPostback)(page, 10000);
                     await successPopup.waitFor({ state: 'visible', timeout: 8000 });
+                    // Save the appended role to database
+                    const roleData = {
+                        roleName: newName,
+                        originalName: r.roleName,
+                        description: `Auto created role (appended) - ${newName}`,
+                        createdAt: new Date().toISOString(),
+                        permissionsConfigured: false,
+                        duplicateStrategy: 'append',
+                        createdBy: 'automation'
+                    };
+                    try {
+                        await dataService_1.DataService.saveEntity('role', newName, roleData);
+                        browser_1.automationEvents.emit('log', `✅ Role "${newName}" (appended) saved to database`);
+                    }
+                    catch (dbErr) {
+                        browser_1.automationEvents.emit('error', `Failed to save appended role to database: ${String(dbErr)}`);
+                    }
                     results.push({
                         original: r.roleName,
                         createdAs: newName,
-                        status: 'created'
+                        status: 'created',
+                        savedToDatabase: true
                     });
                 }
                 else {
@@ -120,11 +139,29 @@ async function createRole(page, roles, options = {}) {
             }
             // ===================== Success (popup OR none) =====================
             browser_1.automationEvents.emit('log', `Role created (popup=${popupAppeared}) for: ${r.roleName}`);
+            const roleData = {
+                roleName: r.roleName,
+                description: `Auto created role - ${r.roleName}`,
+                createdAt: new Date().toISOString(),
+                permissionsConfigured: false,
+                duplicateStrategy: strategy,
+                originalName: r.roleName,
+                createdBy: 'automation'
+            };
+            // Save to database
+            try {
+                await dataService_1.DataService.saveEntity('role', r.roleName, roleData);
+                browser_1.automationEvents.emit('log', `✅ Role "${r.roleName}" saved to database`);
+            }
+            catch (dbErr) {
+                browser_1.automationEvents.emit('error', `Failed to save role to database: ${String(dbErr)}`);
+            }
             results.push({
                 role: r.roleName,
                 status: 'created',
                 popup: popupAppeared,
-                timestamp: new Date().toISOString()
+                timestamp: new Date().toISOString(),
+                savedToDatabase: true
             });
             await page.waitForTimeout(2000);
             // Close success popup

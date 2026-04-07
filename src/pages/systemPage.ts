@@ -103,4 +103,19 @@ export class SystemPage {
 
         await this.page.waitForTimeout(800);
     }
+    async navigateToWorkflowCreate() {
+        await this.systemButton.click();
+        await this.page.waitForLoadState('load');
+
+        await this.createTab.hover();
+        await this.page.waitForTimeout(500);
+
+        const workFlowCreationButton = this.page.getByText('Create workflow to route tasks and deliverables in serial, parallel, or hybrid p...');
+        await Promise.all([
+            this.page.waitForLoadState('load'),
+            workFlowCreationButton.click()
+        ]);
+
+        await this.page.waitForTimeout(800);
+    }
 }

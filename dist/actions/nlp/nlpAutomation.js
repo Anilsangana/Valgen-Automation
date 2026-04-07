@@ -1,41 +1,79 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.executeNLPCommand = executeNLPCommand;
+exports.transcribeVoice = transcribeVoice;
 const playwright_1 = require("playwright");
 const browser_1 = require("../../core/browser");
+const createCategory_1 = require("../createCategory");
+const createSubCategory_1 = require("../createSubCategory");
+const createFunctionalRole_1 = require("../createFunctionalRole");
+const createDepartment_1 = require("../createDepartment");
+const createGroup_1 = require("../createGroup");
+const http = __importStar(require("http"));
+const fs = __importStar(require("fs"));
+const os = __importStar(require("os"));
+const path = __importStar(require("path"));
+const groq_sdk_1 = __importDefault(require("groq-sdk"));
 /**
- * Execute natural language commands using Playwright - Intelligent AI-driven automation
- * This function dynamically understands ANY command variation, not just specific keywords
+ * Execute natural language commands using Playwright & Groq/Ollama
+ * Upgraded to use established framework procedures for maximum robustness.
  */
 async function executeNLPCommand(baseUrl, username, password, command) {
     let browser = null;
     let page = null;
     try {
-        browser_1.automationEvents.emit('log', `🤖 Starting AI-Powered Browser Automation...`);
-        browser_1.automationEvents.emit('log', `📝 Command: "${command}"`);
-        // Launch browser
+        browser_1.automationEvents.emit('log', `🤖 Starting Framework-Aware AI Automation...`);
+        browser_1.automationEvents.emit('log', `📝 User Command: "${command}"`);
         browser = await playwright_1.chromium.launch({ headless: false });
-        const context = await browser.newContext({
-            viewport: { width: 1366, height: 768 }
-        });
+        const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
         page = await context.newPage();
-        // Parse and execute the command with intelligent intent detection
-        const result = await parseAndExecuteCommand(page, command, username, password, baseUrl);
-        browser_1.automationEvents.emit('log', '✅ AI automation completed successfully');
-        return {
-            success: true,
-            command,
-            result
-        };
+        const result = await parseAndExecuteSmartCommand(page, command, username, password, baseUrl);
+        browser_1.automationEvents.emit('log', '✅ AI automation sequence completed');
+        return { success: true, command, result };
     }
     catch (error) {
         browser_1.automationEvents.emit('error', `❌ AI automation failed: ${String(error)}`);
         throw error;
     }
     finally {
-        // Keep browser open for a moment to see results
         if (page) {
-            await page.waitForTimeout(2000);
+            await page.waitForTimeout(3000);
             await page.close();
         }
         if (browser)
@@ -43,540 +81,237 @@ async function executeNLPCommand(baseUrl, username, password, command) {
     }
 }
 /**
- * Intelligent command parser - dynamically understands intent from natural language
- * Works for ANY command variation, not just specific keywords
+ * Transcribe voice using Groq Whisper
  */
-async function parseAndExecuteCommand(page, command, username, password, fallbackUrl) {
-    const results = { actions: [] };
-    // Detect all intents in the command using AI-like pattern matching
-    const intents = detectIntents(command);
-    browser_1.automationEvents.emit('log', `🧠 Detected ${intents.length} action(s) from your command`);
-    // Execute each detected intent in order
-    for (const intent of intents) {
-        try {
-            switch (intent.type) {
-                case 'navigate':
-                    await executeNavigation(page, intent.data, results);
-                    break;
-                case 'screenshot':
-                    await executeScreenshot(page, intent.data, results);
-                    break;
-                case 'wait':
-                    await executeWait(page, intent.data, results);
-                    break;
-                case 'click':
-                    await executeClick(page, intent.data, results);
-                    break;
-                case 'fill':
-                    await executeFill(page, intent.data, results);
-                    break;
-                case 'search':
-                    await executeSearch(page, intent.data, results);
-                    break;
-                case 'login':
-                    await executeLogin(page, intent.data, username, password, results);
-                    break;
-                // Legacy ValGenesis commands
-                case 'create_role':
-                    await executeCreateRole(page, intent.data, results);
-                    break;
-                case 'create_department':
-                    await executeCreateDepartment(page, intent.data, results);
-                    break;
-                case 'create_user':
-                    await executeCreateUser(page, intent.data, results);
-                    break;
-                default:
-                    browser_1.automationEvents.emit('log', `⚠️ Unknown intent type: ${intent.type}`);
+async function transcribeVoice(audioBase64) {
+    const groqKey = process.env.GROQ_API_KEY;
+    if (!groqKey) {
+        throw new Error("GROQ_API_KEY is missing. AI transcription requires an API key.");
+    }
+    const groq = new groq_sdk_1.default({ apiKey: groqKey });
+    const tmpDir = os.tmpdir();
+    const tmpPath = path.join(tmpDir, `voice_${Date.now()}.webm`);
+    const audioBuffer = Buffer.from(audioBase64, 'base64');
+    fs.writeFileSync(tmpPath, audioBuffer);
+    try {
+        browser_1.automationEvents.emit('log', '🔊 Transcribing voice using Groq Whisper...');
+        const transcription = await groq.audio.transcriptions.create({
+            file: fs.createReadStream(tmpPath),
+            model: "whisper-large-v3",
+            prompt: "Transcribe ValGenesis automation commands like 'Login' or 'Create Category'.",
+            language: "en",
+            response_format: "json",
+        });
+        return transcription.text;
+    }
+    finally {
+        if (fs.existsSync(tmpPath))
+            fs.unlinkSync(tmpPath);
+    }
+}
+const SYSTEM_PROMPT = `You are a ValGenesis Automation Expert.
+MISSION: Transcribe the intent into a JSON plan using PROCEDURES below.
+SUMMARY: In your JSON response, include a "summary" field (2-3 sentences) describing exactly what you are doing from a validation perspective.
+PROCEDURES (Prefer these for maximum speed):
+  - create_category(categories: Array<{name, prefix, description}>)
+  - create_sub_category(subCategories: Array<{category, name, prefix, description}>)
+  - create_functional_role(roles: Array<{name, prefix, description}>)
+  - create_department(departments: Array<{name, description}>)
+  - create_group(groups: Array<{name, groupType, description, allUsers: boolean}>)
+LOGIN/NAVIGATE: Always login first if not at dashboard.
+UNIQUENESS: For any name/prefix, USE the current timestamp + random 3 digits (e.g., 'Auditor_1741582231492').
+  - CRITICAL: Never copy the example value exactly. Generate a NEW value for every run.
+- CRITICAL: NO JAVASCRIPT EXPRESSIONS. Do NOT use "+" or "Date()" in JSON. Provide final literal strings ONLY.
+- If no procedure exists, use raw actions: "click", "fill", "hover", "wait", "screenshot".
+- VALGENESIS LOCATOR LIBRARY (ONLY for raw actions):
+  - System Link: "role=link[name=' System']"
+  - Create Tab: "span:has-text('Create')"
+  - Ok Button (Popup): "role=link[name='ok']" or "role=button[name='Ok']"
+- Wrap the response in raw JSON ONLY. No markdown. No text.`;
+async function takeAuditScreenshot(page, caption) {
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const fileName = `Evidence_${timestamp}.png`;
+    const reportsDir = path.join(process.cwd(), 'audit-reports', 'evidence');
+    if (!fs.existsSync(reportsDir)) {
+        fs.mkdirSync(reportsDir, { recursive: true });
+    }
+    const filePath = path.join(reportsDir, fileName);
+    const relativePath = `audit-reports/evidence/${fileName}`;
+    await page.screenshot({ path: filePath, fullPage: true });
+    return {
+        path: relativePath,
+        caption,
+        timestamp: new Date().toISOString()
+    };
+}
+async function parseAndExecuteSmartCommand(page, command, username, password, baseUrl) {
+    const results = { actions: [], screenshots: [], summary: '' };
+    const currentTime = new Date().toISOString();
+    const fullPrompt = `${SYSTEM_PROMPT}\n\nUser request: ${command}\n\nContext:\nbaseUrl: ${baseUrl}\nusername: ${username}\npassword: ${password}\nCurrent Time: ${currentTime}`;
+    browser_1.automationEvents.emit('log', '🧠 Analyzing command using framework domain knowledge...');
+    let jsonStr;
+    try {
+        const groqKey = process.env.GROQ_API_KEY;
+        if (groqKey) {
+            jsonStr = await callGroqAPI(fullPrompt, groqKey);
+        }
+        else {
+            jsonStr = await callOllamaAPI(fullPrompt);
+        }
+    }
+    catch (e) {
+        throw new Error(`AI fail: ${e}`);
+    }
+    let plan;
+    try {
+        let clean = jsonStr.replace(/^```json\s*/im, '').replace(/^```\s*/im, '').replace(/\s*```\s*$/im, '').trim();
+        if (!clean.startsWith('{')) {
+            const jsonMatch = clean.match(/\{[\s\S]*\}/);
+            if (jsonMatch)
+                clean = jsonMatch[0];
+        }
+        if (clean.includes('" +') || clean.includes("Date(")) {
+            browser_1.automationEvents.emit('log', '⚠️ AI returned JS expressions instead of static JSON. Attempting recovery...');
+            try {
+                const recoveryFn = new Function(`return (${clean})`);
+                plan = recoveryFn();
+            }
+            catch (evalErr) {
+                browser_1.automationEvents.emit('log', `❌ Recovery failed: ${evalErr}`);
+                plan = JSON.parse(clean);
             }
         }
-        catch (error) {
-            browser_1.automationEvents.emit('error', `Failed to execute ${intent.type}: ${String(error)}`);
-            results.actions.push({
-                action: intent.type,
-                status: 'failed',
-                error: String(error)
-            });
+        else {
+            plan = JSON.parse(clean);
+        }
+    }
+    catch (e) {
+        throw new Error(`Invalid JSON from AI: ${jsonStr}`);
+    }
+    results.summary = plan.summary || "Automated execution using enterprise framework procedures.";
+    for (const act of plan.actions) {
+        try {
+            if (act.action === 'navigate') {
+                const url = act.url || baseUrl;
+                browser_1.automationEvents.emit('log', `🌐 Navigating to: ${url}`);
+                await page.goto(url, { waitUntil: 'load' });
+                results.actions.push({ action: 'navigate', url, status: 'completed' });
+            }
+            else if (act.action === 'login') {
+                const u = act.username || username;
+                const p = act.password || password;
+                browser_1.automationEvents.emit('log', `🔐 Logging in as: ${u}`);
+                await page.locator('#txtUserName').fill(u);
+                await page.locator('#txtPassword').fill(p);
+                await page.locator('#btnSubmit').click();
+                await page.waitForTimeout(5000);
+                const okBtn = page.getByRole('link', { name: 'ok' });
+                if (await okBtn.count() > 0 && await okBtn.first().isVisible())
+                    await okBtn.first().click();
+                results.actions.push({ action: 'login', username: u, status: 'completed' });
+                results.screenshots.push(await takeAuditScreenshot(page, "Post-Login Dashboard State (Base Evidence)"));
+            }
+            else if (act.action === 'call_procedure') {
+                browser_1.automationEvents.emit('log', `⚡ Calling Framework Procedure: ${act.procedure}`);
+                let procResult;
+                switch (act.procedure) {
+                    case 'create_category':
+                        procResult = await (0, createCategory_1.createCategory)(page, act.args.categories);
+                        break;
+                    case 'create_sub_category':
+                        procResult = await (0, createSubCategory_1.createSubCategory)(page, act.args.subCategories);
+                        break;
+                    case 'create_functional_role':
+                        procResult = await (0, createFunctionalRole_1.createFunctionalRole)(page, act.args.roles);
+                        break;
+                    case 'create_department':
+                        procResult = await (0, createDepartment_1.createDepartment)(page, act.args.departments);
+                        break;
+                    case 'create_group':
+                        procResult = await (0, createGroup_1.createGroup)(page, act.args.groups);
+                        break;
+                    default:
+                        throw new Error(`Unknown procedure: ${act.procedure}`);
+                }
+                let overallStatus = 'completed';
+                if (Array.isArray(procResult)) {
+                    const hasFailure = procResult.some(r => r.status === 'error' || r.status === 'failed');
+                    const hasSkip = procResult.some(r => r.status === 'skipped');
+                    if (hasFailure)
+                        overallStatus = 'sub-item-failed';
+                    else if (hasSkip)
+                        overallStatus = 'warning (duplicate/skipped)';
+                }
+                results.actions.push({ action: act.procedure, status: overallStatus, detail: procResult });
+                results.screenshots.push(await takeAuditScreenshot(page, `Evidence after procedure: ${act.procedure}`));
+            }
+            else if (act.action === 'click') {
+                await page.locator(act.selector).first().click({ force: true });
+                results.actions.push({ action: 'click', selector: act.selector, status: 'completed' });
+            }
+            else if (act.action === 'fill') {
+                await page.locator(act.selector).first().fill(act.value);
+                results.actions.push({ action: 'fill', selector: act.selector, value: act.value, status: 'completed' });
+            }
+            else if (act.action === 'wait') {
+                await page.waitForTimeout(act.timeout || 2000);
+                results.actions.push({ action: 'wait', status: 'completed' });
+            }
+            else if (act.action === 'screenshot') {
+                const ss = await takeAuditScreenshot(page, act.caption || "Manual Screenshot");
+                results.screenshots.push(ss);
+                results.actions.push({ action: 'screenshot', path: ss.path, status: 'completed' });
+            }
+        }
+        catch (err) {
+            browser_1.automationEvents.emit('error', `Action failed: ${act.action} - ${err}`);
+            results.actions.push({ action: act.action, status: 'failed', error: String(err) });
         }
     }
     return results;
 }
-/**
- * Intelligent intent detection - understands natural language dynamically
- * Supports many variations of the same intent
- */
-function detectIntents(command) {
-    const intents = [];
-    const lower = command.toLowerCase();
-    // Intent 1: Navigation (VERY flexible - understands many ways to say "navigate")
-    const navigationPatterns = [
-        'open', 'navigate', 'go to', 'visit', 'load', 'browse', 'access',
-        'goto', 'show', 'display', 'bring up', 'pull up', 'head to',
-        'take me to', 'show me', 'get to', 'launch'
-    ];
-    if (navigationPatterns.some(pattern => lower.includes(pattern))) {
-        const url = extractUrl(command);
-        if (url) {
-            intents.push({ type: 'navigate', data: { url } });
-        }
-    }
-    // Intent 2: Wait/Pause (understands "wait until page loads", "until ready", etc.)
-    const waitPatterns = [
-        'wait until', 'wait for', 'pause', 'hold', 'stay', 'until the page',
-        'until it', 'loaded', 'ready', 'displayed', 'appears', 'shown',
-        'elements are displayed', 'page is loaded', 'fully loaded'
-    ];
-    if (waitPatterns.some(pattern => lower.includes(pattern))) {
-        intents.push({ type: 'wait', data: { reason: 'page_load' } });
-    }
-    // Intent 3: Screenshot (many ways to say "take screenshot")
-    const screenshotPatterns = [
-        'screenshot', 'capture', 'snap', 'take a picture', 'take a photo',
-        'save image', 'grab', 'screen capture', 'print screen', 'take pic',
-        'take image', 'screencap', 'screen shot'
-    ];
-    if (screenshotPatterns.some(pattern => lower.includes(pattern))) {
-        intents.push({ type: 'screenshot', data: {} });
-    }
-    // Intent 4: Click (flexible click detection)
-    const clickIndicators = ['click', 'press', 'tap', 'select', 'hit', 'push'];
-    if (clickIndicators.some(indicator => lower.includes(indicator))) {
-        const target = extractClickTarget(command);
-        if (target) {
-            intents.push({ type: 'click', data: { target } });
-        }
-    }
-    // Intent 5: Fill/Type (flexible text input)
-    const fillIndicators = ['fill', 'type', 'enter', 'input', 'write', 'put', 'insert'];
-    if (fillIndicators.some(indicator => lower.includes(indicator))) {
-        const fillData = extractFillData(command);
-        if (fillData) {
-            intents.push({ type: 'fill', data: fillData });
-        }
-    }
-    // Intent 6: Login
-    if (lower.includes('login') || lower.includes('log in') || lower.includes('sign in') || lower.includes('signin')) {
-        const creds = extractLoginCredentials(command, '', '');
-        intents.push({ type: 'login', data: creds });
-    }
-    // Legacy intents for ValGenesis
-    if (lower.includes('create') && lower.includes('role')) {
-        intents.push({
-            type: 'create_role', data: {
-                name: extractRoleName(command),
-                type: extractRoleType(command)
-            }
-        });
-    }
-    if (lower.includes('create') && (lower.includes('department') || lower.includes('dept'))) {
-        intents.push({
-            type: 'create_department', data: {
-                name: extractDepartmentName(command)
-            }
-        });
-    }
-    if (lower.includes('create') && lower.includes('user')) {
-        intents.push({
-            type: 'create_user', data: {
-                email: extractUserEmail(command),
-                role: extractUserRole(command),
-                department: extractUserDepartment(command)
-            }
-        });
-    }
-    return intents;
-}
-// ============= INTELLIGENT INTENT EXECUTION FUNCTIONS =============
-async function executeNavigation(page, data, results) {
-    browser_1.automationEvents.emit('log', `🌐 Navigating to: ${data.url}`);
-    // Smart navigation that waits for everything to load
-    await page.goto(data.url, {
-        waitUntil: 'networkidle', // Wait for network to be idle
-        timeout: 60000
+async function callGroqAPI(prompt, apiKey) {
+    const groq = new groq_sdk_1.default({ apiKey });
+    const completion = await groq.chat.completions.create({
+        messages: [{ role: "user", content: prompt }],
+        model: "llama-3.1-8b-instant",
+        temperature: 0.1,
+        response_format: { type: "json_object" }
     });
-    browser_1.automationEvents.emit('log', '⏳ Waiting for page elements to fully render...');
-    await page.waitForTimeout(2000); // Extra time for dynamic content
-    browser_1.automationEvents.emit('log', '✅ Page loaded and ready');
-    results.actions.push({ action: 'navigate', url: data.url, status: 'completed' });
+    return completion.choices[0]?.message?.content || "";
 }
-async function executeWait(page, data, results) {
-    browser_1.automationEvents.emit('log', `⏳ Waiting for ${data.reason}...`);
-    if (data.reason === 'page_load') {
-        // Wait for page to be completely stable
-        await page.waitForLoadState('networkidle', { timeout: 30000 });
-        await page.waitForTimeout(2000);
-    }
-    browser_1.automationEvents.emit('log', '✅ Wait completed');
-    results.actions.push({ action: 'wait', reason: data.reason, status: 'completed' });
-}
-async function executeScreenshot(page, data, results) {
-    browser_1.automationEvents.emit('log', '📸 Capturing screenshot...');
-    const screenshotPath = await takeScreenshot(page);
-    browser_1.automationEvents.emit('log', `✅ Screenshot saved: ${screenshotPath}`);
-    results.actions.push({ action: 'screenshot', path: screenshotPath, status: 'completed' });
-    results.screenshot = screenshotPath;
-}
-async function executeClick(page, data, results) {
-    browser_1.automationEvents.emit('log', `🖱️ Clicking: ${data.target}`);
-    await clickElement(page, data.target);
-    results.actions.push({ action: 'click', target: data.target, status: 'completed' });
-}
-async function executeFill(page, data, results) {
-    browser_1.automationEvents.emit('log', `⌨️ Filling "${data.field}" with "${data.value}"`);
-    await fillField(page, data.field, data.value);
-    results.actions.push({ action: 'fill', field: data.field, value: data.value, status: 'completed' });
-}
-/**
- * Intelligent search execution - finds search box and performs search
- */
-async function executeSearch(page, data, results) {
-    const query = data.query;
-    browser_1.automationEvents.emit('log', `🔍 Searching for: "${query}"`);
-    try {
-        // Try to find search input intelligently (works on Google, Bing, DuckDuckGo, etc.)
-        const searchSelectors = [
-            'input[name="q"]', // Google, DuckDuckGo
-            'input[type="search"]', // Generic search
-            'input[name="search"]', // Common search name
-            'input[aria-label*="Search" i]', // Aria label
-            'input[placeholder*="Search" i]', // Placeholder text
-            'textarea[name="q"]', // Some sites use textarea
-            '#search', // Common ID
-            '.search-input', // Common class
-            'input[title*="Search" i]' // Title attribute
-        ];
-        let searchBox = null;
-        for (const selector of searchSelectors) {
-            const count = await page.locator(selector).count();
-            if (count > 0) {
-                searchBox = page.locator(selector).first();
-                browser_1.automationEvents.emit('log', `✓ Found search box using selector: ${selector}`);
-                break;
-            }
-        }
-        if (!searchBox) {
-            throw new Error('Could not find search box on the page');
-        }
-        // Fill the search box
-        await searchBox.fill(query);
-        browser_1.automationEvents.emit('log', `✓ Entered search query: "${query}"`);
-        // Wait a moment for autocomplete
-        await page.waitForTimeout(500);
-        // Try to submit (press Enter or click search button)
-        await searchBox.press('Enter');
-        browser_1.automationEvents.emit('log', '✓ Submitted search (pressed Enter)');
-        // Wait for search results to load
-        await page.waitForLoadState('networkidle', { timeout: 10000 });
-        await page.waitForTimeout(1000);
-        browser_1.automationEvents.emit('log', '✅ Search completed successfully');
-        results.actions.push({
-            action: 'search',
-            query: query,
-            status: 'completed'
+async function callOllamaAPI(prompt) {
+    return new Promise((resolve, reject) => {
+        const body = JSON.stringify({
+            model: "qwen2.5:7b",
+            prompt: prompt,
+            stream: false,
+            format: "json"
         });
-    }
-    catch (error) {
-        browser_1.automationEvents.emit('error', `Search failed: ${String(error)}`);
-        throw error;
-    }
-}
-async function executeLogin(page, data, defaultUsername, defaultPassword, results) {
-    const username = data.username || defaultUsername;
-    const password = data.password || defaultPassword;
-    browser_1.automationEvents.emit('log', `🔐 Logging in as: ${username}`);
-    await performLogin(page, username, password);
-    results.actions.push({ action: 'login', username, status: 'completed' });
-}
-async function executeCreateRole(page, data, results) {
-    browser_1.automationEvents.emit('log', `🔐 Creating role: ${data.name}`);
-    await createRole(page, data.name, data.type);
-    results.actions.push({ action: 'create_role', name: data.name, type: data.type, status: 'completed' });
-}
-async function executeCreateDepartment(page, data, results) {
-    browser_1.automationEvents.emit('log', `🏢 Creating department: ${data.name}`);
-    await createDepartment(page, data.name);
-    results.actions.push({ action: 'create_department', name: data.name, status: 'completed' });
-}
-async function executeCreateUser(page, data, results) {
-    browser_1.automationEvents.emit('log', `👤 Creating user: ${data.email}`);
-    await createUser(page, data.email, data.role, data.department);
-    results.actions.push({ action: 'create_user', email: data.email, role: data.role, department: data.department, status: 'completed' });
-}
-// ============= HELPER FUNCTIONS FOR EXTRACTION =============
-/**
- * Extract URL from command - finds any http/https URL
- */
-function extractUrl(command) {
-    const urlPattern = /(https?:\/\/[^\s"'<>]+)/i;
-    const match = command.match(urlPattern);
-    return match ? match[1] : null;
-}
-/**
- * Take screenshot and save to audit-reports folder
- */
-async function takeScreenshot(page) {
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const fileName = `Screenshot_${timestamp}.png`;
-    const screenshotPath = `audit-reports/${fileName}`;
-    await page.screenshot({ path: screenshotPath, fullPage: true });
-    browser_1.automationEvents.emit('log', `✅ Screenshot saved: ${fileName}`);
-    return screenshotPath;
-}
-/**
- * Extract login credentials from command
- */
-function extractLoginCredentials(command, defaultUsername, defaultPassword) {
-    const usernamePattern = /username\s+["']?([^"'\s]+)["']?/i;
-    const passwordPattern = /password\s+["']?([^"'\s]+)["']?/i;
-    const usernameMatch = command.match(usernamePattern);
-    const passwordMatch = command.match(passwordPattern);
-    return {
-        username: usernameMatch ? usernameMatch[1] : defaultUsername,
-        password: passwordMatch ? passwordMatch[1] : defaultPassword
-    };
-}
-/**
- * Extract click target from command
- */
-function extractClickTarget(command) {
-    const patterns = [
-        /click\s+(?:on\s+)?["']([^"']+)["']/i,
-        /click\s+(?:the\s+)?(\w+(?:\s+\w+){0,3})\s+button/i,
-        /click\s+(\w+)/i
-    ];
-    for (const pattern of patterns) {
-        const match = command.match(pattern);
-        if (match && match[1]) {
-            return match[1].trim();
-        }
-    }
-    return null;
-}
-/**
- * Click element by text or selector
- */
-async function clickElement(page, target) {
-    try {
-        const elementByText = page.locator(`button:has-text("${target}"), a:has-text("${target}"), input[value*="${target}" i]`).first();
-        const count = await elementByText.count();
-        if (count > 0) {
-            await elementByText.click();
-            browser_1.automationEvents.emit('log', `✅ Clicked element with text: ${target}`);
-        }
-        else {
-            await page.click(target);
-            browser_1.automationEvents.emit('log', `✅ Clicked element: ${target}`);
-        }
-        await page.waitForTimeout(1000);
-    }
-    catch (error) {
-        throw new Error(`Failed to click "${target}": ${String(error)}`);
-    }
-}
-/**
- * Extract field and value to fill
- */
-function extractFillData(command) {
-    const patterns = [
-        /(?:fill|enter|type)\s+["']([^"']+)["']\s+(?:in|into|to)\s+["']([^"']+)["']/i,
-        /(?:fill|enter|type)\s+([^\s]+)\s+(?:in|into|to)\s+([^\s]+)/i
-    ];
-    for (const pattern of patterns) {
-        const match = command.match(pattern);
-        if (match && match[1] && match[2]) {
-            return {
-                value: match[1].trim(),
-                field: match[2].trim()
-            };
-        }
-    }
-    return null;
-}
-/**
- * Fill a field with value
- */
-async function fillField(page, field, value) {
-    try {
-        const fieldLocator = page.locator(`input[placeholder*="${field}" i], input[name*="${field}" i], input[id*="${field}" i], ` +
-            `textarea[placeholder*="${field}" i], textarea[name*="${field}" i]`).first();
-        await fieldLocator.fill(value);
-        browser_1.automationEvents.emit('log', `✅ Filled "${field}" with "${value}"`);
-        await page.waitForTimeout(500);
-    }
-    catch (error) {
-        throw new Error(`Failed to fill field "${field}": ${String(error)}`);
-    }
-}
-// ============= LEGACY VALGENESIS FUNCTIONS =============
-async function performLogin(page, username, password) {
-    try {
-        await page.waitForSelector('input[type="text"], input[name*="user" i], input[id*="user" i]', { timeout: 10000 });
-        const usernameField = page.locator('input[type="text"], input[name*="user" i], input[id*="user" i]').first();
-        await usernameField.fill(username);
-        browser_1.automationEvents.emit('log', `Filled username: ${username}`);
-        const passwordField = page.locator('input[type="password"]').first();
-        await passwordField.fill(password);
-        browser_1.automationEvents.emit('log', 'Filled password');
-        const loginButton = page.locator('input[type="submit"], button[type="submit"], button:has-text("Login"), input[value*="Login" i]').first();
-        await loginButton.click();
-        browser_1.automationEvents.emit('log', 'Clicked login button');
-        await page.waitForLoadState('domcontentloaded');
-        await page.waitForTimeout(2000);
-        browser_1.automationEvents.emit('log', '✓ Login successful');
-    }
-    catch (error) {
-        throw new Error(`Login failed: ${String(error)}`);
-    }
-}
-async function createRole(page, roleName, roleType) {
-    try {
-        const adminLink = page.locator('a:has-text("Admin"), button:has-text("Admin"), [title*="Admin" i]').first();
-        await adminLink.click();
-        await page.waitForTimeout(1000);
-        const rolesLink = page.locator('a:has-text("Roles"), button:has-text("Roles"), [title*="Role" i]').first();
-        await rolesLink.click();
-        await page.waitForTimeout(1000);
-        const createButton = page.locator('button:has-text("Create"), button:has-text("New"), input[value*="Create" i]').first();
-        await createButton.click();
-        await page.waitForTimeout(1000);
-        const roleNameField = page.locator('input[name*="role" i], input[id*="role" i]').first();
-        await roleNameField.fill(roleName);
-        browser_1.automationEvents.emit('log', `Filled role name: ${roleName}`);
-        if (roleType) {
-            const roleTypeDropdown = page.locator('select[name*="type" i], select[id*="type" i]').first();
-            await roleTypeDropdown.selectOption({ label: roleType });
-            browser_1.automationEvents.emit('log', `Selected role type: ${roleType}`);
-        }
-        const saveButton = page.locator('button:has-text("Save"), button:has-text("Submit"), input[value*="Save" i]').first();
-        await saveButton.click();
-        await page.waitForTimeout(2000);
-        browser_1.automationEvents.emit('log', `✓ Role "${roleName}" created successfully`);
-    }
-    catch (error) {
-        throw new Error(`Role creation failed: ${String(error)}`);
-    }
-}
-async function createDepartment(page, deptName) {
-    try {
-        const deptLink = page.locator('a:has-text("Department"), button:has-text("Department")').first();
-        await deptLink.click();
-        await page.waitForTimeout(1000);
-        const createButton = page.locator('button:has-text("Create"), button:has-text("New")').first();
-        await createButton.click();
-        await page.waitForTimeout(1000);
-        const deptField = page.locator('input[name*="dept" i], input[id*="dept" i], input[name*="name" i]').first();
-        await deptField.fill(deptName);
-        browser_1.automationEvents.emit('log', `Filled department name: ${deptName}`);
-        const saveButton = page.locator('button:has-text("Save"), input[value*="Save" i]').first();
-        await saveButton.click();
-        await page.waitForTimeout(2000);
-        browser_1.automationEvents.emit('log', `✓ Department "${deptName}" created successfully`);
-    }
-    catch (error) {
-        throw new Error(`Department creation failed: ${String(error)}`);
-    }
-}
-async function createUser(page, email, role, department) {
-    try {
-        const usersLink = page.locator('a:has-text("Users"), button:has-text("Users")').first();
-        await usersLink.click();
-        await page.waitForTimeout(1000);
-        const createButton = page.locator('button:has-text("Create"), button:has-text("New")').first();
-        await createButton.click();
-        await page.waitForTimeout(1000);
-        const emailField = page.locator('input[type="email"], input[name*="email" i]').first();
-        await emailField.fill(email);
-        browser_1.automationEvents.emit('log', `Filled email: ${email}`);
-        const roleDropdown = page.locator('select[name*="role" i]').first();
-        await roleDropdown.selectOption({ label: role });
-        browser_1.automationEvents.emit('log', `Selected role: ${role}`);
-        const deptDropdown = page.locator('select[name*="dept" i]').first();
-        await deptDropdown.selectOption({ label: department });
-        browser_1.automationEvents.emit('log', `Selected department: ${department}`);
-        const saveButton = page.locator('button:has-text("Save"), input[value*="Save" i]').first();
-        await saveButton.click();
-        await page.waitForTimeout(2000);
-        browser_1.automationEvents.emit('log', `✓ User "${email}" created successfully`);
-    }
-    catch (error) {
-        throw new Error(`User creation failed: ${String(error)}`);
-    }
-}
-function extractRoleName(command) {
-    const patterns = [
-        /create\s+(?:a\s+)?role\s+["']([^"']+)["']/i,
-        /create\s+(?:a\s+)?role\s+(\w+)/i,
-        /role\s+called\s+["']([^"']+)["']/i,
-        /role\s+called\s+(\w+)/i,
-        /role\s+["']([^"']+)["']/i,
-    ];
-    for (const pattern of patterns) {
-        const match = command.match(pattern);
-        if (match && match[1]) {
-            return match[1].trim();
-        }
-    }
-    return 'Default Role';
-}
-function extractRoleType(command) {
-    const patterns = [
-        /(?:with\s+)?(?:role\s+)?type\s+["']([^"']+)["']/i,
-        /(?:with\s+)?(?:role\s+)?type\s+([A-Za-z\s]+?)(?:\s+and|\s*$)/i,
-    ];
-    for (const pattern of patterns) {
-        const match = command.match(pattern);
-        if (match && match[1]) {
-            return match[1].trim();
-        }
-    }
-    return 'Standard';
-}
-function extractDepartmentName(command) {
-    const patterns = [
-        /create\s+(?:a\s+)?department\s+["']([^"']+)["']/i,
-        /create\s+(?:a\s+)?department\s+(\w+)/i,
-        /department\s+called\s+["']([^"']+)["']/i,
-        /department\s+["']([^"']+)["']/i,
-    ];
-    for (const pattern of patterns) {
-        const match = command.match(pattern);
-        if (match && match[1]) {
-            return match[1].trim();
-        }
-    }
-    return 'Default Department';
-}
-function extractUserEmail(command) {
-    const emailPattern = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/;
-    const match = command.match(emailPattern);
-    if (match) {
-        return match[0];
-    }
-    return 'user@example.com';
-}
-function extractUserRole(command) {
-    const patterns = [
-        /(?:with\s+)?role\s+["']([^"']+)["']/i,
-        /(?:with\s+)?role\s+'([^']+)'/i,
-    ];
-    for (const pattern of patterns) {
-        const match = command.match(pattern);
-        if (match && match[1]) {
-            return match[1].trim();
-        }
-    }
-    return 'User';
-}
-function extractUserDepartment(command) {
-    const patterns = [
-        /(?:in\s+)?department\s+["']([^"']+)["']/i,
-        /(?:in\s+)?department\s+'([^']+)'/i,
-    ];
-    for (const pattern of patterns) {
-        const match = command.match(pattern);
-        if (match && match[1]) {
-            return match[1].trim();
-        }
-    }
-    return 'General';
+        const req = http.request({
+            hostname: 'localhost',
+            port: 11434,
+            path: '/api/generate',
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Content-Length': Buffer.byteLength(body)
+            }
+        }, (res) => {
+            let data = '';
+            res.on('data', chunk => data += chunk);
+            res.on('end', () => {
+                try {
+                    const parsed = JSON.parse(data);
+                    resolve(parsed.response);
+                }
+                catch (e) {
+                    reject(e);
+                }
+            });
+        });
+        req.on('error', reject);
+        req.write(body);
+        req.end();
+    });
 }

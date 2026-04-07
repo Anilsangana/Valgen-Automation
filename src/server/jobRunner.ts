@@ -35,6 +35,8 @@ import { createCategory } from '../actions/createCategory';
 import { createSubCategory } from '../actions/createSubCategory';
 import { createGroup } from '../actions/createGroup';
 import { createFunctionalRole } from '../actions/createFunctionalRole';
+import { runCompleteWorkflow } from '../actions/workflow/completeWorkflow';
+import { createWorkflow } from '../actions/createWorkflow';
 
 
 
@@ -1056,6 +1058,102 @@ export async function runCreateFunctionalRoles(
     return result;
   } catch (err) {
     automationEvents.emit('error', `Error during functional role creation: ${String(err)}`);
+    throw err;
+  } finally {
+    await browser.close();
+  }
+}
+
+// ===================== COMPLETE WORKFLOW =====================
+export async function runWorkflowAutomation(
+  baseUrl: string,
+  username: string,
+  password: string,
+  functionalRoleName: string,
+  approvalPeriodDays?: number,
+  frequencyDays?: number,
+  serialParallel?: 'Serial' | 'Parallel'
+) {
+  // Backend validation
+  if (!baseUrl || !username || !password || !functionalRoleName) {
+    throw new Error('Missing required fields: baseUrl, username, password, functionalRoleName');
+  }
+
+  if (functionalRoleName.length < 2 || functionalRoleName.length > 100) {
+    throw new Error('Functional role name must be between 2 and 100 characters');
+  }
+
+  const { browser, context } = await launchBrowser({ headless: false });
+  const page = await newPage(context);
+
+  automationEvents.emit('log', '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  automationEvents.emit('log', 'Starting Workflow Automation');
+  automationEvents.emit('log', '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+
+  try {
+    const input = {
+      baseUrl,
+      username,
+      password,
+      functionalRoleName,
+      approvalPeriodDays,
+      frequencyDays,
+      serialParallel: serialParallel || 'Serial',
+      generateData: true
+    };
+
+    automationEvents.emit('log', `Creating workflow with functional role: ${functionalRoleName}`);
+    const result = await runCompleteWorkflow(page, input);
+
+    if (result.success) {
+      automationEvents.emit('log', '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      automationEvents.emit('log', '✅ Workflow automation completed successfully!');
+      automationEvents.emit('log', '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    } else {
+      automationEvents.emit('log', '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      automationEvents.emit('error', '❌ Workflow automation completed with failures');
+      automationEvents.emit('log', '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    }
+
+    return result;
+  } catch (err) {
+    automationEvents.emit('log', '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    automationEvents.emit('error', `❌ Workflow automation failed: ${String(err)}`);
+    automationEvents.emit('log', '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    throw err;
+  } finally {
+    await browser.close();
+  }
+}
+
+// ===================== CREATE WORKFLOWS =====================
+export async function runCreateWorkflows(
+  baseUrl: string,
+  username: string,
+  password: string,
+  workflows: any[]
+) {
+  const { browser, context } = await launchBrowser({ headless: false });
+  const page = await newPage(context);
+
+  automationEvents.emit('log', '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  automationEvents.emit('log', `Starting Workflow Creation (${workflows.length} workflow(s))`);
+  automationEvents.emit('log', '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+
+  try {
+    await page.goto(baseUrl);
+    await login(page, baseUrl, username, password);
+    automationEvents.emit('log', '✅ Login successful');
+
+    const result = await createWorkflow(page, workflows);
+
+    automationEvents.emit('log', '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    automationEvents.emit('log', '✅ Workflow creation completed');
+    automationEvents.emit('log', '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+
+    return result;
+  } catch (err) {
+    automationEvents.emit('error', `❌ Workflow creation failed: ${String(err)}`);
     throw err;
   } finally {
     await browser.close();

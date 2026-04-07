@@ -5,6 +5,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 require("dotenv/config");
 const express_1 = __importDefault(require("express"));
+const db_1 = require("../utils/db");
 const path_1 = __importDefault(require("path"));
 const body_parser_1 = __importDefault(require("body-parser"));
 const jobRunner_1 = require("./jobRunner");
@@ -13,6 +14,8 @@ const pdfGenerator_1 = require("../utils/pdfGenerator");
 const nlpAutomation_1 = require("../actions/nlp/nlpAutomation");
 const ollamaAutomation_1 = require("../actions/ai/ollamaAutomation");
 const ollamaMcpAgent_1 = require("../actions/ai/ollamaMcpAgent");
+const statsStore_1 = require("../utils/statsStore");
+const dataService_1 = require("../utils/dataService");
 // ── Prevent unhandled promise rejections from crashing the server ──────────────
 process.on('unhandledRejection', (reason, promise) => {
     console.error('[Server] Unhandled Rejection at:', promise, 'reason:', reason);
@@ -80,6 +83,8 @@ app.post('/run/createUsers', async (req, res) => {
         });
         const fileName = pdfPath.split(/[/\\]/).pop() || 'audit-report.pdf';
         browser_1.automationEvents.emit('log', `✓ PDF audit report generated: ${fileName}`);
+        await (0, db_1.dbRun)(`INSERT INTO audit_reports (operation, admin_user, base_url, file_name, file_path)
+   VALUES (?, ?, ?, ?, ?)`, ['User Creation', username, baseUrl, fileName, pdfPath]);
         res.json({
             success: hasSuccess,
             result,
@@ -127,6 +132,8 @@ app.post('/run/createRoles', async (req, res) => {
         });
         const fileName = pdfPath.split(/[/\\]/).pop() || 'audit-report.pdf';
         browser_1.automationEvents.emit('log', `✓ PDF audit report generated: ${fileName}`);
+        await (0, db_1.dbRun)(`INSERT INTO audit_reports (operation, admin_user, base_url, file_name, file_path)
+       VALUES (?, ?, ?, ?, ?)`, ['Role Creation', username, baseUrl, fileName, pdfPath]);
         res.json({
             success: true,
             result,
@@ -487,7 +494,77 @@ app.post('/run/createFunctionalRoles', async (req, res) => {
         }
     }
 });
+// ===================== CREATE WORKFLOW =====================
+app.post('/run/createWorkflow', async (req, res) => {
+    const { baseUrl, username, password, functionalRoleName, approvalPeriodDays, frequencyDays, serialParallel } = req.body;
+    // Server-side validation
+    if (!baseUrl || !username || !password || !functionalRoleName) {
+        browser_1.automationEvents.emit('error', 'Missing required fields for workflow creation');
+        return res.status(400).json({ success: false, message: 'Missing required fields' });
+    }
+    if (functionalRoleName.length < 2 || functionalRoleName.length > 100) {
+        browser_1.automationEvents.emit('error', 'Functional role name must be between 2 and 100 characters');
+        return res.status(400).json({ success: false, message: 'Functional role name must be between 2 and 100 characters' });
+    }
+    try {
+        browser_1.automationEvents.emit('log', 'Processing workflow creation request...');
+        const result = await (0, jobRunner_1.runWorkflowAutomation)(baseUrl, username, password, functionalRoleName, approvalPeriodDays, frequencyDays, serialParallel);
+        // Generate PDF audit trail
+        const timestamp = new Date().toISOString();
+        const pdfPath = await (0, pdfGenerator_1.generateAuditPDF)({
+            operation: 'Workflow Creation',
+            timestamp,
+            adminUser: username,
+            baseUrl,
+            results: { workflow: result }
+        });
+        const fileName = pdfPath.split(/[/\\]/).pop() || 'audit-report.pdf';
+        browser_1.automationEvents.emit('log', `✓ PDF audit report generated: ${fileName}`);
+        await (0, db_1.dbRun)(`INSERT INTO audit_reports (operation, admin_user, base_url, file_name, file_path)
+       VALUES (?, ?, ?, ?, ?)`, ['Workflow Creation', username, baseUrl, fileName, pdfPath]);
+        res.json({
+            success: result.success,
+            result,
+            pdfFileName: fileName,
+            pdfDownloadUrl: `/download-audit/${fileName}`
+        });
+    }
+    catch (err) {
+        browser_1.automationEvents.emit('error', `Workflow creation failed: ${String(err)}`);
+        try {
+            const timestamp = new Date().toISOString();
+            const pdfPath = await (0, pdfGenerator_1.generateAuditPDF)({
+                operation: 'Workflow Creation',
+                timestamp,
+                adminUser: username,
+                baseUrl,
+                results: { workflow: [{ functionalRole: functionalRoleName, status: 'error', message: String(err) }] }
+            });
+            const fileName = pdfPath.split(/[/\\]/).pop() || 'audit-report.pdf';
+            await (0, db_1.dbRun)(`INSERT INTO audit_reports (operation, admin_user, base_url, file_name, file_path)
+         VALUES (?, ?, ?, ?, ?)`, ['Workflow Creation', username, baseUrl, fileName, pdfPath]);
+            res.status(500).json({ success: false, message: String(err), pdfFileName: fileName, pdfDownloadUrl: `/download-audit/${fileName}` });
+        }
+        catch {
+            res.status(500).json({ success: false, message: String(err) });
+        }
+    }
+});
 // ===================== NATURAL LANGUAGE AUTOMATION ENDPOINT =====================
+app.post('/run/transcribe', async (req, res) => {
+    const { audio } = req.body;
+    if (!audio) {
+        return res.status(400).json({ success: false, message: 'Audio blob is required' });
+    }
+    try {
+        const text = await (0, nlpAutomation_1.transcribeVoice)(audio);
+        res.json({ success: true, text });
+    }
+    catch (err) {
+        browser_1.automationEvents.emit('error', `Transcription failed: ${String(err)}`);
+        res.status(500).json({ success: false, message: String(err) });
+    }
+});
 app.post('/run/nlp-automation', async (req, res) => {
     const { baseUrl, username, password, command } = req.body;
     // Only command is required for standalone AI automation
@@ -498,15 +575,21 @@ app.post('/run/nlp-automation', async (req, res) => {
     try {
         browser_1.automationEvents.emit('log', '🤖 Processing AI automation request...');
         // Use provided credentials or empty strings (AI will work without them)
+        const startTime = Date.now();
         const result = await (0, nlpAutomation_1.executeNLPCommand)(baseUrl || '', username || '', password || '', command);
-        // Generate PDF audit trail
+        const durationMs = Date.now() - startTime;
+        // Log stats
+        (0, statsStore_1.logRun)(command, result.success, durationMs, result.result.actions.length);
+        // Generate PDF audit trail with evidence
         const timestamp = new Date().toISOString();
         const pdfPath = await (0, pdfGenerator_1.generateAuditPDF)({
             operation: 'AI Browser Automation',
             timestamp,
             adminUser: username || 'AI User',
             baseUrl: baseUrl || 'Command-driven',
-            results: { nlp: result }
+            results: { nlp: result },
+            screenshots: result.result.screenshots || [],
+            summary: result.result.summary || ""
         });
         const fileName = pdfPath.split(/[/\\]/).pop() || 'audit-report.pdf';
         browser_1.automationEvents.emit('log', `✓ PDF audit report generated: ${fileName}`);
@@ -647,6 +730,10 @@ app.get('/run/ollama-status', (_req, res) => {
         setupUrl: 'http://localhost:11434'
     });
 });
+// ===================== ANALYTICS / STATS ENDPOINTS =====================
+app.get('/api/stats', async (_req, res) => {
+    res.json(await (0, statsStore_1.getStatsAsync)());
+});
 // ===================== MCP AGENT ENDPOINTS =====================
 /**
  * Main Playwright MCP integration endpoint
@@ -688,6 +775,225 @@ app.post('/run/mcp-close', async (_req, res) => {
         res.json({ success: true, message: 'MCP Browser session closed.' });
     }
     catch (err) {
+        res.status(500).json({ success: false, message: String(err) });
+    }
+});
+// ── DATA MANAGEMENT API ENDPOINTS ────────────────────────────────────────
+/**
+ * Get all created entities grouped by type
+ */
+app.get('/api/entities', async (_req, res) => {
+    try {
+        const entities = await dataService_1.DataService.getAllEntities();
+        res.json({ success: true, data: entities });
+    }
+    catch (err) {
+        console.error('[API] Error fetching entities:', err);
+        res.status(500).json({ success: false, message: String(err) });
+    }
+});
+/**
+ * Get entities of a specific type
+ */
+app.get('/api/entities/:type', async (req, res) => {
+    try {
+        const { type } = req.params;
+        const { status = 'active' } = req.query;
+        const entities = await dataService_1.DataService.getEntities(type, status);
+        res.json({ success: true, data: entities });
+    }
+    catch (err) {
+        console.error('[API] Error fetching entities:', err);
+        res.status(500).json({ success: false, message: String(err) });
+    }
+});
+/**
+ * Save a created entity
+ */
+app.post('/api/entities', async (req, res) => {
+    try {
+        const { entityType, entityName, entityData, automationRunId } = req.body;
+        if (!entityType || !entityName || !entityData) {
+            return res.status(400).json({
+                success: false,
+                message: 'Missing required fields: entityType, entityName, entityData'
+            });
+        }
+        const id = await dataService_1.DataService.saveEntity(entityType, entityName, entityData, automationRunId);
+        res.json({ success: true, data: { id } });
+    }
+    catch (err) {
+        console.error('[API] Error saving entity:', err);
+        res.status(500).json({ success: false, message: String(err) });
+    }
+});
+/**
+ * Update entity status
+ */
+app.patch('/api/entities/:id/status', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { status } = req.body;
+        if (!status) {
+            return res.status(400).json({
+                success: false,
+                message: 'Missing required field: status'
+            });
+        }
+        await dataService_1.DataService.updateEntityStatus(parseInt(id), status);
+        res.json({ success: true });
+    }
+    catch (err) {
+        console.error('[API] Error updating entity status:', err);
+        res.status(500).json({ success: false, message: String(err) });
+    }
+});
+/**
+ * Get entity statistics
+ */
+app.get('/api/entities/stats', async (_req, res) => {
+    try {
+        const stats = await dataService_1.DataService.getEntityStats();
+        const recent = await dataService_1.DataService.getRecentEntities(10);
+        res.json({ success: true, data: { stats, recent } });
+    }
+    catch (err) {
+        console.error('[API] Error fetching entity stats:', err);
+        res.status(500).json({ success: false, message: String(err) });
+    }
+});
+/**
+ * Session data management
+ */
+app.get('/api/session/:key', async (req, res) => {
+    try {
+        const { key } = req.params;
+        const data = await dataService_1.DataService.getSessionData(key);
+        res.json({ success: true, data });
+    }
+    catch (err) {
+        console.error('[API] Error fetching session data:', err);
+        res.status(500).json({ success: false, message: String(err) });
+    }
+});
+app.post('/api/session/:key', async (req, res) => {
+    try {
+        const { key } = req.params;
+        const { value } = req.body;
+        if (value === undefined) {
+            return res.status(400).json({
+                success: false,
+                message: 'Missing required field: value'
+            });
+        }
+        await dataService_1.DataService.setSessionData(key, value);
+        res.json({ success: true });
+    }
+    catch (err) {
+        console.error('[API] Error setting session data:', err);
+        res.status(500).json({ success: false, message: String(err) });
+    }
+});
+app.get('/api/session', async (_req, res) => {
+    try {
+        const allData = await dataService_1.DataService.getAllSessionData();
+        res.json({ success: true, data: allData });
+    }
+    catch (err) {
+        console.error('[API] Error fetching all session data:', err);
+        res.status(500).json({ success: false, message: String(err) });
+    }
+});
+/**
+ * Chat history management
+ */
+app.get('/api/chat/history', async (req, res) => {
+    try {
+        const { sessionId, limit = 50 } = req.query;
+        const history = await dataService_1.DataService.getChatHistory(sessionId, parseInt(limit));
+        res.json({ success: true, data: history });
+    }
+    catch (err) {
+        console.error('[API] Error fetching chat history:', err);
+        res.status(500).json({ success: false, message: String(err) });
+    }
+});
+app.post('/api/chat/message', async (req, res) => {
+    try {
+        const { messageType, content, sessionId, metadata } = req.body;
+        if (!messageType || !content) {
+            return res.status(400).json({
+                success: false,
+                message: 'Missing required fields: messageType, content'
+            });
+        }
+        const id = await dataService_1.DataService.saveChatMessage(messageType, content, sessionId, metadata);
+        res.json({ success: true, data: { id } });
+    }
+    catch (err) {
+        console.error('[API] Error saving chat message:', err);
+        res.status(500).json({ success: false, message: String(err) });
+    }
+});
+/**
+ * Browser session management
+ */
+app.get('/api/browser/sessions', async (_req, res) => {
+    try {
+        const sessions = await dataService_1.DataService.getActiveBrowserSessions();
+        res.json({ success: true, data: sessions });
+    }
+    catch (err) {
+        console.error('[API] Error fetching browser sessions:', err);
+        res.status(500).json({ success: false, message: String(err) });
+    }
+});
+app.post('/api/browser/sessions', async (req, res) => {
+    try {
+        const { sessionId, metadata } = req.body;
+        if (!sessionId) {
+            return res.status(400).json({
+                success: false,
+                message: 'Missing required field: sessionId'
+            });
+        }
+        const id = await dataService_1.DataService.createBrowserSession(sessionId, metadata);
+        res.json({ success: true, data: { id } });
+    }
+    catch (err) {
+        console.error('[API] Error creating browser session:', err);
+        res.status(500).json({ success: false, message: String(err) });
+    }
+});
+app.patch('/api/browser/sessions/:sessionId', async (req, res) => {
+    try {
+        const { sessionId } = req.params;
+        const { status } = req.body;
+        if (!status) {
+            return res.status(400).json({
+                success: false,
+                message: 'Missing required field: status'
+            });
+        }
+        await dataService_1.DataService.updateBrowserSession(sessionId, status);
+        res.json({ success: true });
+    }
+    catch (err) {
+        console.error('[API] Error updating browser session:', err);
+        res.status(500).json({ success: false, message: String(err) });
+    }
+});
+/**
+ * Cleanup old data
+ */
+app.post('/api/cleanup', async (req, res) => {
+    try {
+        const { daysToKeep = 30 } = req.body;
+        await dataService_1.DataService.cleanupOldData(parseInt(daysToKeep));
+        res.json({ success: true, message: `Cleaned up data older than ${daysToKeep} days` });
+    }
+    catch (err) {
+        console.error('[API] Error cleaning up data:', err);
         res.status(500).json({ success: false, message: String(err) });
     }
 });

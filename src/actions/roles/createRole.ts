@@ -6,6 +6,8 @@ import { waitForPostback, waitForOverlayGone, waitForIframeLoaderGone } from '..
 
 import { AdministrationPage } from '../../pages/administrationPage';
 
+import { DataService } from '../../utils/dataService';
+
 
 
 export type CreateRoleOptions = {
@@ -267,7 +269,23 @@ export async function createRole(
 
           await successPopup.waitFor({ state: 'visible', timeout: 8000 });
 
+          // Save the appended role to database
+          const roleData = {
+            roleName: newName,
+            originalName: r.roleName,
+            description: `Auto created role (appended) - ${newName}`,
+            createdAt: new Date().toISOString(),
+            permissionsConfigured: false,
+            duplicateStrategy: 'append',
+            createdBy: 'automation'
+          };
 
+          try {
+            await DataService.saveEntity('role', newName, roleData);
+            automationEvents.emit('log', `✅ Role "${newName}" (appended) saved to database`);
+          } catch (dbErr) {
+            automationEvents.emit('error', `Failed to save appended role to database: ${String(dbErr)}`);
+          }
 
           results.push({
 
@@ -275,7 +293,9 @@ export async function createRole(
 
             createdAs: newName,
 
-            status: 'created'
+            status: 'created',
+
+            savedToDatabase: true
 
           });
 
@@ -311,7 +331,23 @@ export async function createRole(
 
       );
 
+      const roleData = {
+        roleName: r.roleName,
+        description: `Auto created role - ${r.roleName}`,
+        createdAt: new Date().toISOString(),
+        permissionsConfigured: false,
+        duplicateStrategy: strategy,
+        originalName: r.roleName,
+        createdBy: 'automation'
+      };
 
+      // Save to database
+      try {
+        await DataService.saveEntity('role', r.roleName, roleData);
+        automationEvents.emit('log', `✅ Role "${r.roleName}" saved to database`);
+      } catch (dbErr) {
+        automationEvents.emit('error', `Failed to save role to database: ${String(dbErr)}`);
+      }
 
       results.push({
 
@@ -321,7 +357,9 @@ export async function createRole(
 
         popup: popupAppeared,
 
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+
+        savedToDatabase: true
 
       });
       await page.waitForTimeout(2000);

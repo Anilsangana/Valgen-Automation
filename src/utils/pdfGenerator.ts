@@ -17,7 +17,10 @@ interface AuditReportData {
         subCategory?: any[];
         group?: any[];
         functionalRole?: any[];
+        workflow?: any;
     };
+    screenshots?: Array<{ path: string; caption: string; timestamp: string }>;
+    summary?: string;
 }
 
 /**
@@ -269,6 +272,22 @@ export async function generateAuditPDF(data: AuditReportData): Promise<string> {
             }
 
             // User Creation Results
+            if (data.results.workflow && data.results.workflow.length > 0) {
+                addEnterpriseResultSection(doc, 'WORKFLOW CREATION', data.results.workflow, (item: any) => {
+                    const fields: Array<{ label: string; value: string }> = [
+                        { label: 'Workflow Name', value: item.workflow || item.name || 'N/A' },
+                        { label: 'Status', value: item.status || 'N/A' },
+                        { label: 'Review Required', value: item.reviewRequired ? 'Yes' : 'No' },
+                        { label: 'Description', value: item.description || 'N/A' }
+                    ];
+                    if (item.timestamp) {
+                        fields.push({ label: 'Timestamp', value: formatTimestamp(item.timestamp) });
+                    }
+                    return fields;
+                });
+            }
+
+            // User Creation Results
             if (data.results.user && data.results.user.length > 0) {
                 addEnterpriseResultSection(doc, 'USER CREATION', data.results.user, (item: any) => {
                     const fields: Array<{ label: string; value: string }> = [
@@ -386,82 +405,85 @@ export async function generateAuditPDF(data: AuditReportData): Promise<string> {
                         });
                     }
 
-                    // Embed screenshot if available
-                    if (result.screenshot) {
-                        doc.moveDown(1);
+                }
+            }
 
-                        // Check if we need a new page
-                        if (doc.y > 650) {
+            // ================== AI VERIFICATION SUMMARY ==================
+            if (data.summary) {
+                if (doc.y > 650) doc.addPage();
+                
+                const summaryHeaderY = doc.y;
+                doc.rect(50, summaryHeaderY, 495, 28)
+                    .fillAndStroke('#EBF8FF', '#90CDF4');
+
+                doc.fontSize(11)
+                    .font('Helvetica-Bold')
+                    .fillColor('#2A4365')
+                    .text('🧠 AI VERIFICATION SUMMARY', 60, summaryHeaderY + 9);
+
+                doc.y = summaryHeaderY + 35;
+                doc.rect(50, doc.y, 495, 80)
+                    .stroke('#BEE3F8');
+                
+                doc.fontSize(9)
+                    .font('Helvetica')
+                    .fillColor('#2D3748')
+                    .text(data.summary, 65, doc.y + 12, { width: 465, align: 'justify' });
+                
+                doc.y += 90;
+            }
+
+            // ================== CAPTURED EVIDENCE (SCREENSHOTS) ==================
+            if (data.screenshots && data.screenshots.length > 0) {
+                doc.addPage();
+                
+                const evidenceHeaderY = 60;
+                doc.rect(50, evidenceHeaderY, 495, 30)
+                    .fillAndStroke('#F7FAFC', '#CBD5E0');
+
+                doc.fontSize(13)
+                    .font('Helvetica-Bold')
+                    .fillColor('#1A365D')
+                    .text('VISUAL EVIDENCE (SCREENSHOTS)', 60, evidenceHeaderY + 10);
+
+                doc.y = evidenceHeaderY + 50;
+
+                for (const ss of data.screenshots) {
+                    const screenshotPath = path.join(process.cwd(), ss.path);
+                    if (fs.existsSync(screenshotPath)) {
+                        // Header for each screenshot
+                        if (doc.y > 500) {
                             doc.addPage();
                             doc.y = 60;
                         }
-
-                        const screenshotHeaderY = doc.y;
-                        doc.rect(50, screenshotHeaderY, 495, 28)
-                            .fillAndStroke('#EDF2F7', '#CBD5E0');
-
-                        doc.fontSize(11)
+                        
+                        const ssTitleY = doc.y;
+                        doc.fontSize(10)
                             .font('Helvetica-Bold')
-                            .fillColor('#1A365D')
-                            .text('📸 CAPTURED SCREENSHOT', 60, screenshotHeaderY + 9);
+                            .fillColor('#4A5568')
+                            .text(ss.caption, 50, ssTitleY);
+                        
+                        doc.fontSize(8)
+                            .font('Helvetica')
+                            .fillColor('#A0AEC0')
+                            .text(`Captured: ${formatTimestamp(ss.timestamp)}`, 50, ssTitleY + 12, { align: 'right', width: 495 });
+                        
+                        doc.y += 25;
 
-                        doc.y = screenshotHeaderY + 40;
-
-                        // Try to embed the screenshot image
                         try {
-                            const screenshotPath = path.join(process.cwd(), result.screenshot);
-
-                            if (fs.existsSync(screenshotPath)) {
-                                // Check if we need a new page for the image
-                                if (doc.y > 720) {
-                                    doc.addPage();
-                                    doc.y = 60;
-                                }
-
-                                const imageY = doc.y;
-
-                                // Add image with reasonable size (fit within margins)
-                                // Max width: 495 (page width - margins), max height: ~400
-                                doc.image(screenshotPath, 50, imageY, {
-                                    fit: [495, 400],
-                                    align: 'center'
-                                });
-
-                                // Move cursor below image
-                                doc.y = imageY + 410;
-
-                                // Add caption
-                                doc.fontSize(8)
-                                    .font('Helvetica')
-                                    .fillColor('#718096')
-                                    .text(`Screenshot: ${result.screenshot}`, 50, doc.y, {
-                                        align: 'center',
-                                        width: 495
-                                    });
-
-                                doc.moveDown(1);
-                            } else {
-                                // Screenshot file not found, just mention it
-                                doc.fontSize(9)
-                                    .font('Helvetica')
-                                    .fillColor('#4A5568')
-                                    .text(`Screenshot path: ${result.screenshot}`, 60, doc.y);
-                                doc.fontSize(8)
-                                    .fillColor('#E53E3E')
-                                    .text('(Screenshot file not found at PDF generation time)', 60, doc.y + 15);
-                                doc.moveDown(2);
-                            }
-                        } catch (error) {
-                            // Error loading screenshot
-                            doc.fontSize(9)
-                                .font('Helvetica')
-                                .fillColor('#4A5568')
-                                .text(`Screenshot path: ${result.screenshot}`, 60, doc.y);
-                            doc.fontSize(8)
-                                .fillColor('#E53E3E')
-                                .text(`Error embedding screenshot: ${String(error)}`, 60, doc.y + 15);
-                            doc.moveDown(2);
+                            doc.image(screenshotPath, 50, doc.y, {
+                                fit: [495, 300],
+                                align: 'center'
+                            });
+                            doc.y += 310;
+                            
+                            // Border around image
+                            doc.rect(50, ssTitleY + 22, 495, 305).stroke('#E2E8F0');
+                        } catch (e) {
+                            doc.fontSize(8).fillColor('#E53E3E').text(`Error embedding: ${String(e)}`, 60, doc.y);
+                            doc.y += 40;
                         }
+                        doc.moveDown(2);
                     }
                 }
             }

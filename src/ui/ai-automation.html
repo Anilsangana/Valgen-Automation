@@ -43,9 +43,12 @@
                 <span class="status-dot"></span>
                 <span>System Active</span>
             </div>
-            <a href="index.html" style="color: #fff; text-decoration: none; margin-left: 20px; font-size: 14px;">
-                ← Back to Main App
-            </a>
+            <nav class="nav-links">
+                <a href="index.html" class="nav-link">🏠 Home</a>
+                <a href="dashboard.html" class="nav-link">📊 Dashboard</a>
+                <a href="ai-automation.html" class="nav-link primary active">🤖 AI Automation</a>
+                <a href="ollama-chat.html" class="nav-link secondary">✨ Smart IMS AI Chat</a>
+            </nav>
         </div>
     </header>
 
@@ -95,11 +98,38 @@
                 <h2>💬 Tell the AI What to Do</h2>
 
                 <div class="input-group slide-in" style="animation-delay: 50ms">
-                    <label>Your Command <span style="color:var(--danger)">*</span></label>
-                    <textarea id="aiCommand"
-                        placeholder='Example: "Can you open https://www.saucedemo.com/ and take a screenshot of the web page?"'
-                        rows="5"
-                        style="width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text); font-family: inherit; font-size: 14px; resize: vertical;"></textarea>
+                    <label>Your Instructions <span style="color:var(--danger)">*</span></label>
+                    <div class="voice-input-wrapper">
+                        <textarea id="aiCommand"
+                            placeholder='Example: "Login and create a unique functional role called Lead Researcher"'
+                            rows="5"
+                            style="width: 100%; padding: 12px 48px 12px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text); font-family: inherit; font-size: 14px; resize: vertical;"></textarea>
+                        <button id="micBtn" class="mic-btn" title="Click to record your voice command">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"></path>
+                                <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                                <line x1="12" y1="19" x2="12" y2="22"></line>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="quick-chips slide-in" style="animation-delay: 80ms">
+                    <div class="chip" data-cmd="Login with credits and create a unique functional role called 'Senior Auditor'">
+                        <span>🎭</span> Role
+                    </div>
+                    <div class="chip" data-cmd="Navigate to system and create a Category named 'Smart Automation' and a SubCategory named 'AI Testing' under it">
+                        <span>📦</span> Category Chain
+                    </div>
+                    <div class="chip" data-cmd="Create a group named 'Validation Team' with all users selected">
+                        <span>👥</span> Group
+                    </div>
+                    <div class="chip" data-cmd="Navigate to Administration and create a Department named 'Compliance Lab'">
+                        <span>🏢</span> Dept
+                    </div>
+                    <div class="chip" data-cmd="Login and create a workflow named 'Validation Review WF' with Applicable To set to Authoring and Execution, Review Required Yes, and Serial approval">
+                        <span>🔄</span> Workflow
+                    </div>
                 </div>
 
                 <!-- Example Commands -->
@@ -143,6 +173,9 @@
             <h2>✅ Automation Results</h2>
             <div id="resultsList"></div>
         </section>
+
+        <!-- React Island (isolated; does not affect existing UI) -->
+        <div id="react-root" style="margin-top: 24px;"></div>
 
         <!-- Quick Tips Section -->
         <section class="card fade-in" style="margin-top: 20px;">
@@ -192,6 +225,11 @@
             Natural Language Processing • Screenshot Capture • Full Audit Trail
         </div>
     </footer>
+
+    <!-- React (loaded for isolated "islands"; existing JS remains unchanged) -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="react-island.js" defer></script>
 
     <!-- Application Script -->
     <script src="ai-automation.js" defer></script>
